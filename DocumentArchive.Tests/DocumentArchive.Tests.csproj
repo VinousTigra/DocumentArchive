@@ -36,7 +36,6 @@
       <Folder Include="ControllersTests\" />
       <Folder Include="MappingTests\" />
       <Folder Include="RepositoriesTests\" />
-      <Folder Include="ValidatorsTests\" />
     </ItemGroup>
 
 </Project>

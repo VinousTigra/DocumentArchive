@@ -1,8 +1,8 @@
 using AutoMapper;
 using DocumentArchive.API.Controllers;
 using DocumentArchive.Core.DTOs.Category;
+using DocumentArchive.Core.Interfaces;
 using DocumentArchive.Core.Models;
-using DocumentArchive.Infrastructure.Repositories;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
@@ -11,15 +11,15 @@ namespace DocumentArchive.Tests.ControllersTests;
 
 public class CategoriesControllerTests
 {
-    private readonly Mock<CategoryRepository> _categoryRepoMock;
-    private readonly Mock<DocumentRepository> _documentRepoMock;
+    private readonly Mock<ICategoryRepository> _categoryRepoMock;
+    private readonly Mock<IDocumentRepository> _documentRepoMock;
     private readonly Mock<IMapper> _mapperMock;
     private readonly CategoriesController _controller;
 
     public CategoriesControllerTests()
     {
-        _categoryRepoMock = new Mock<CategoryRepository>();
-        _documentRepoMock = new Mock<DocumentRepository>();
+        _categoryRepoMock = new Mock<ICategoryRepository>();
+        _documentRepoMock = new Mock<IDocumentRepository>();
         _mapperMock = new Mock<IMapper>();
         _controller = new CategoriesController(
             _categoryRepoMock.Object,
@@ -57,6 +57,7 @@ public class CategoriesControllerTests
         var responseDto = new CategoryResponseDto { Id = category.Id, Name = "NewCat" };
         _mapperMock.Setup(x => x.Map<Category>(createDto)).Returns(category);
         _mapperMock.Setup(x => x.Map<CategoryResponseDto>(category)).Returns(responseDto);
+        _categoryRepoMock.Setup(x => x.AddAsync(category)).Returns(Task.CompletedTask);
 
         // Act
         var result = await _controller.Create(createDto);

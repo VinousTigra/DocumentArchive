@@ -13,8 +13,7 @@ public class UserRepositoryTests : IDisposable
     {
         _testDirectory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
         Directory.CreateDirectory(_testDirectory);
-        Environment.CurrentDirectory = _testDirectory;
-        _repository = new UserRepository();
+        _repository = new UserRepository(_testDirectory);
     }
 
     public void Dispose()
@@ -31,7 +30,8 @@ public class UserRepositoryTests : IDisposable
         {
             Id = Guid.NewGuid(),
             Username = "testuser",
-            Email = "test@example.com"
+            Email = "test@example.com",
+            CreatedAt = DateTime.UtcNow
         };
 
         // Act
@@ -45,15 +45,52 @@ public class UserRepositoryTests : IDisposable
     }
 
     [Fact]
+    public async Task GetAllAsync_ShouldReturnAllUsers()
+    {
+        // Arrange
+        var user1 = new User { Id = Guid.NewGuid(), Username = "user1", Email = "user1@test.com" };
+        var user2 = new User { Id = Guid.NewGuid(), Username = "user2", Email = "user2@test.com" };
+        await _repository.AddAsync(user1);
+        await _repository.AddAsync(user2);
+
+        // Act
+        var result = await _repository.GetAllAsync();
+
+        // Assert
+        result.Should().HaveCount(2);
+        result.Select(u => u.Username).Should().Contain(new[] { "user1", "user2" });
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_ShouldReturnUser_WhenExists()
+    {
+        // Arrange
+        var user = new User { Id = Guid.NewGuid(), Username = "test", Email = "test@test.com" };
+        await _repository.AddAsync(user);
+
+        // Act
+        var result = await _repository.GetByIdAsync(user.Id);
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.Username.Should().Be("test");
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_ShouldReturnNull_WhenNotExists()
+    {
+        // Act
+        var result = await _repository.GetByIdAsync(Guid.NewGuid());
+
+        // Assert
+        result.Should().BeNull();
+    }
+
+    [Fact]
     public async Task FindByEmailAsync_ShouldReturnUser_WhenExists()
     {
         // Arrange
-        var user = new User
-        {
-            Id = Guid.NewGuid(),
-            Username = "john",
-            Email = "john@example.com"
-        };
+        var user = new User { Id = Guid.NewGuid(), Username = "john", Email = "john@example.com" };
         await _repository.AddAsync(user);
 
         // Act
@@ -78,12 +115,7 @@ public class UserRepositoryTests : IDisposable
     public async Task FindByUsernameAsync_ShouldReturnUser_WhenExists()
     {
         // Arrange
-        var user = new User
-        {
-            Id = Guid.NewGuid(),
-            Username = "alice",
-            Email = "alice@example.com"
-        };
+        var user = new User { Id = Guid.NewGuid(), Username = "alice", Email = "alice@example.com" };
         await _repository.AddAsync(user);
 
         // Act
@@ -95,10 +127,45 @@ public class UserRepositoryTests : IDisposable
     }
 
     [Fact]
+    public async Task FindByUsernameAsync_ShouldReturnNull_WhenNotExists()
+    {
+        // Act
+        var result = await _repository.FindByUsernameAsync("bob");
+
+        // Assert
+        result.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task UpdateAsync_ShouldModifyUser()
+    {
+        // Arrange
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Username = "oldname",
+            Email = "old@test.com"
+        };
+        await _repository.AddAsync(user);
+
+        user.Username = "newname";
+        user.Email = "new@test.com";
+        user.UpdatedAt = DateTime.UtcNow;
+
+        // Act
+        await _repository.UpdateAsync(user);
+        var updated = await _repository.GetByIdAsync(user.Id);
+
+        // Assert
+        updated!.Username.Should().Be("newname");
+        updated.Email.Should().Be("new@test.com");
+    }
+
+    [Fact]
     public async Task DeleteAsync_ShouldRemoveUser()
     {
         // Arrange
-        var user = new User { Id = Guid.NewGuid(), Username = "temp", Email = "temp@ex.com" };
+        var user = new User { Id = Guid.NewGuid(), Username = "temp", Email = "temp@test.com" };
         await _repository.AddAsync(user);
 
         // Act

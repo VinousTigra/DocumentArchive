@@ -10,17 +10,17 @@ public abstract class FileStorageRepository<T> where T : class
     private ConcurrentDictionary<Guid, T> _items = new();
     private readonly Func<T, Guid> _getId;
 
-    protected FileStorageRepository(string fileName, Func<T, Guid> getId)
+    // Добавляем необязательный параметр dataDirectory
+    protected FileStorageRepository(string fileName, Func<T, Guid> getId, string? dataDirectory = null)
     {
-        var dataDirectory = Path.Combine(Directory.GetCurrentDirectory(), "App_Data");
-        if (!Directory.Exists(dataDirectory))
-            Directory.CreateDirectory(dataDirectory);
-
-        _filePath = Path.Combine(dataDirectory, fileName);
+        var baseDirectory = dataDirectory ?? Path.Combine(Directory.GetCurrentDirectory(), "App_Data");
+        if (!Directory.Exists(baseDirectory))
+            Directory.CreateDirectory(baseDirectory);
+        
+        _filePath = Path.Combine(baseDirectory, fileName);
         _getId = getId;
-        LoadFromFile().Wait(); // загружаем при создании
+        LoadFromFile().Wait();
     }
-
     private async Task LoadFromFile()
     {
         if (!File.Exists(_filePath))

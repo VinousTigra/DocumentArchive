@@ -2,8 +2,8 @@
 using DocumentArchive.Core.DTOs.Document;
 using DocumentArchive.Core.DTOs.Shared;
 using DocumentArchive.Core.DTOs.User;
+using DocumentArchive.Core.Interfaces;    // <-- Добавить!
 using DocumentArchive.Core.Models;
-using DocumentArchive.Infrastructure.Repositories;
 using Microsoft.AspNetCore.Mvc;
 
 namespace DocumentArchive.API.Controllers;
@@ -13,13 +13,13 @@ namespace DocumentArchive.API.Controllers;
 [Produces("application/json")]
 public class UsersController : ControllerBase
 {
-    private readonly UserRepository _userRepo;
-    private readonly DocumentRepository _documentRepo;
+    private readonly IUserRepository _userRepo;          // <-- Интерфейс
+    private readonly IDocumentRepository _documentRepo;  // <-- Интерфейс
     private readonly IMapper _mapper;
 
     public UsersController(
-        UserRepository userRepo,
-        DocumentRepository documentRepo,
+        IUserRepository userRepo,
+        IDocumentRepository documentRepo,
         IMapper mapper)
     {
         _userRepo = userRepo;

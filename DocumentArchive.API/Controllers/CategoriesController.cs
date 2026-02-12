@@ -2,8 +2,8 @@
 using DocumentArchive.Core.DTOs.Category;
 using DocumentArchive.Core.DTOs.Document;
 using DocumentArchive.Core.DTOs.Shared;
+using DocumentArchive.Core.Interfaces;    // <-- Добавить!
 using DocumentArchive.Core.Models;
-using DocumentArchive.Infrastructure.Repositories;
 using Microsoft.AspNetCore.Mvc;
 
 namespace DocumentArchive.API.Controllers;
@@ -13,13 +13,13 @@ namespace DocumentArchive.API.Controllers;
 [Produces("application/json")]
 public class CategoriesController : ControllerBase
 {
-    private readonly CategoryRepository _categoryRepo;
-    private readonly DocumentRepository _documentRepo;
+    private readonly ICategoryRepository _categoryRepo;   // <-- Интерфейс
+    private readonly IDocumentRepository _documentRepo;   // <-- Интерфейс
     private readonly IMapper _mapper;
 
     public CategoriesController(
-        CategoryRepository categoryRepo,
-        DocumentRepository documentRepo,
+        ICategoryRepository categoryRepo,
+        IDocumentRepository documentRepo,
         IMapper mapper)
     {
         _categoryRepo = categoryRepo;

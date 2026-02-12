@@ -1,6 +1,6 @@
 using DocumentArchive.Core.DTOs.Category;
+using DocumentArchive.Core.Interfaces;
 using DocumentArchive.Core.Models;
-using DocumentArchive.Infrastructure.Repositories;
 using DocumentArchive.Services.Validators;
 using FluentAssertions;
 using FluentValidation.TestHelper;
@@ -10,41 +10,48 @@ namespace DocumentArchive.Tests.ValidatorsTests;
 
 public class CreateCategoryDtoValidatorTests
 {
-    private readonly Mock<CategoryRepository> _categoryRepoMock;
+    private readonly Mock<ICategoryRepository> _categoryRepoMock;
     private readonly CreateCategoryDtoValidator _validator;
 
     public CreateCategoryDtoValidatorTests()
     {
-        _categoryRepoMock = new Mock<CategoryRepository>();
+        _categoryRepoMock = new Mock<ICategoryRepository>();
         _validator = new CreateCategoryDtoValidator(_categoryRepoMock.Object);
     }
 
     [Fact]
     public async Task Should_HaveError_When_Name_IsEmpty()
     {
-        // Arrange
         var dto = new CreateCategoryDto { Name = "" };
-
-        // Act
         var result = await _validator.TestValidateAsync(dto);
+        result.ShouldHaveValidationErrorFor(x => x.Name);
+    }
 
-        // Assert
+    [Fact]
+    public async Task Should_HaveError_When_Name_ExceedsMaxLength()
+    {
+        var dto = new CreateCategoryDto { Name = new string('a', 101) };
+        var result = await _validator.TestValidateAsync(dto);
         result.ShouldHaveValidationErrorFor(x => x.Name);
     }
 
     [Fact]
     public async Task Should_HaveError_When_Name_AlreadyExists()
     {
-        // Arrange
         var dto = new CreateCategoryDto { Name = "HR" };
-        _categoryRepoMock.Setup(x => x.FindByNameAsync("HR"))
-            .ReturnsAsync(new Category { Name = "HR" });
-
-        // Act
+        _categoryRepoMock.Setup(x => x.FindByNameAsync(dto.Name))
+            .ReturnsAsync(new Category { Name = dto.Name });
         var result = await _validator.TestValidateAsync(dto);
+        result.ShouldHaveValidationErrorFor(x => x.Name);
+    }
 
-        // Assert
-        result.ShouldHaveValidationErrorFor(x => x.Name)
-            .WithErrorMessage("Категория с таким названием уже существует");
+    [Fact]
+    public async Task Should_NotHaveError_When_Name_IsUnique()
+    {
+        var dto = new CreateCategoryDto { Name = "NewCategory" };
+        _categoryRepoMock.Setup(x => x.FindByNameAsync(dto.Name))
+            .ReturnsAsync((Category?)null);
+        var result = await _validator.TestValidateAsync(dto);
+        result.ShouldNotHaveValidationErrorFor(x => x.Name);
     }
 }

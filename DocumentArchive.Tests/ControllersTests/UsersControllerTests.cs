@@ -1,8 +1,8 @@
 using AutoMapper;
 using DocumentArchive.API.Controllers;
 using DocumentArchive.Core.DTOs.User;
+using DocumentArchive.Core.Interfaces;
 using DocumentArchive.Core.Models;
-using DocumentArchive.Infrastructure.Repositories;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
@@ -11,15 +11,15 @@ namespace DocumentArchive.Tests.ControllersTests;
 
 public class UsersControllerTests
 {
-    private readonly Mock<UserRepository> _userRepoMock;
-    private readonly Mock<DocumentRepository> _documentRepoMock;
+    private readonly Mock<IUserRepository> _userRepoMock;
+    private readonly Mock<IDocumentRepository> _documentRepoMock;
     private readonly Mock<IMapper> _mapperMock;
     private readonly UsersController _controller;
 
     public UsersControllerTests()
     {
-        _userRepoMock = new Mock<UserRepository>();
-        _documentRepoMock = new Mock<DocumentRepository>();
+        _userRepoMock = new Mock<IUserRepository>();
+        _documentRepoMock = new Mock<IDocumentRepository>();
         _mapperMock = new Mock<IMapper>();
         _controller = new UsersController(
             _userRepoMock.Object,
@@ -58,6 +58,7 @@ public class UsersControllerTests
         var responseDto = new UserResponseDto { Id = user.Id, Username = "newuser", Email = "new@test.com" };
         _mapperMock.Setup(x => x.Map<User>(createDto)).Returns(user);
         _mapperMock.Setup(x => x.Map<UserResponseDto>(user)).Returns(responseDto);
+        _userRepoMock.Setup(x => x.AddAsync(user)).Returns(Task.CompletedTask);
 
         // Act
         var result = await _controller.Create(createDto);

@@ -1,15 +1,17 @@
 ﻿using DocumentArchive.Core.DTOs.ArchiveLog;
-using DocumentArchive.Infrastructure.Repositories;
+using DocumentArchive.Core.Interfaces;
 using FluentValidation;
 
 namespace DocumentArchive.Services.Validators;
 
 public class CreateArchiveLogDtoValidator : AbstractValidator<CreateArchiveLogDto>
 {
-    private readonly DocumentRepository _documentRepo;
-    private readonly UserRepository _userRepo;
+    private readonly IDocumentRepository _documentRepo;
+    private readonly IUserRepository _userRepo;
 
-    public CreateArchiveLogDtoValidator(DocumentRepository documentRepo, UserRepository userRepo)
+    public CreateArchiveLogDtoValidator(
+        IDocumentRepository documentRepo,
+        IUserRepository userRepo)
     {
         _documentRepo = documentRepo;
         _userRepo = userRepo;

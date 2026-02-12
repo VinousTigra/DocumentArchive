@@ -13,8 +13,7 @@ public class DocumentRepositoryTests : IDisposable
     {
         _testDirectory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
         Directory.CreateDirectory(_testDirectory);
-        Environment.CurrentDirectory = _testDirectory;
-        _repository = new DocumentRepository();
+        _repository = new DocumentRepository(_testDirectory); // передаём временную папку
     }
 
     public void Dispose()

@@ -1,10 +1,12 @@
-﻿using DocumentArchive.Core.Models;
+﻿using DocumentArchive.Core.Interfaces;
+using DocumentArchive.Core.Models;
 
 namespace DocumentArchive.Infrastructure.Repositories;
 
-public class ArchiveLogRepository : FileStorageRepository<ArchiveLog>
+public class ArchiveLogRepository : FileStorageRepository<ArchiveLog>, IArchiveLogRepository
 {
-    public ArchiveLogRepository() : base("logs.json", l => l.Id)
+    public ArchiveLogRepository(string? dataDirectory = null)
+        : base("logs.json", l => l.Id, dataDirectory)
     {
     }
 

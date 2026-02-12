@@ -25,6 +25,9 @@ public class MappingProfile : Profile
         CreateMap<Document, DocumentListItemDto>()
             .ForMember(dest => dest.CategoryName,
                 opt => opt.MapFrom(src => src.Category != null ? src.Category.Name : "Без категории"));
+        CreateMap<UpdateBulkDocumentDto, Document>()
+            .ForAllMembers(opts => opts.Condition((src, dest, srcMember) => srcMember != null));
+        
 
         // ========== User ==========
         CreateMap<CreateUserDto, User>();
@@ -50,5 +53,6 @@ public class MappingProfile : Profile
         CreateMap<ArchiveLog, ArchiveLogListItemDto>()
             .ForMember(dest => dest.UserName,
                 opt => opt.MapFrom(src => src.User != null ? src.User.Username : null));
+        
     }
 }

@@ -3,6 +3,7 @@ using DocumentArchive.Core.DTOs.ArchiveLog;
 using DocumentArchive.Core.DTOs.Document;
 using DocumentArchive.Core.DTOs.Shared;
 using DocumentArchive.Core.Models;
+using DocumentArchive.Core.Interfaces; 
 using DocumentArchive.Infrastructure.Repositories;
 using Microsoft.AspNetCore.Mvc;
 
@@ -13,17 +14,19 @@ namespace DocumentArchive.API.Controllers;
 [Produces("application/json")]
 public class DocumentsController : ControllerBase
 {
-    private readonly DocumentRepository _documentRepo;
-    private readonly CategoryRepository _categoryRepo;
-    private readonly UserRepository _userRepo;
-    private readonly ArchiveLogRepository _logRepo;
+    // Заменяем конкретные типы на интерфейсы
+    private readonly IDocumentRepository _documentRepo;
+    private readonly ICategoryRepository _categoryRepo;
+    private readonly IUserRepository _userRepo;
+    private readonly IArchiveLogRepository _logRepo;
     private readonly IMapper _mapper;
 
+    // В конструкторе принимаем интерфейсы
     public DocumentsController(
-        DocumentRepository documentRepo,
-        CategoryRepository categoryRepo,
-        UserRepository userRepo,
-        ArchiveLogRepository logRepo,
+        IDocumentRepository documentRepo,
+        ICategoryRepository categoryRepo,
+        IUserRepository userRepo,
+        IArchiveLogRepository logRepo,
         IMapper mapper)
     {
         _documentRepo = documentRepo;

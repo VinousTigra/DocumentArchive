@@ -1,8 +1,8 @@
 ﻿using AutoMapper;
 using DocumentArchive.Core.DTOs.ArchiveLog;
 using DocumentArchive.Core.DTOs.Shared;
+using DocumentArchive.Core.Interfaces;    // <-- Добавить!
 using DocumentArchive.Core.Models;
-using DocumentArchive.Infrastructure.Repositories;
 using Microsoft.AspNetCore.Mvc;
 
 namespace DocumentArchive.API.Controllers;
@@ -12,15 +12,15 @@ namespace DocumentArchive.API.Controllers;
 [Produces("application/json")]
 public class ArchiveLogsController : ControllerBase
 {
-    private readonly ArchiveLogRepository _logRepo;
-    private readonly DocumentRepository _documentRepo;
-    private readonly UserRepository _userRepo;
+    private readonly IArchiveLogRepository _logRepo;   // <-- Интерфейс
+    private readonly IDocumentRepository _documentRepo; // <-- Интерфейс
+    private readonly IUserRepository _userRepo;        // <-- Интерфейс
     private readonly IMapper _mapper;
 
     public ArchiveLogsController(
-        ArchiveLogRepository logRepo,
-        DocumentRepository documentRepo,
-        UserRepository userRepo,
+        IArchiveLogRepository logRepo,
+        IDocumentRepository documentRepo,
+        IUserRepository userRepo,
         IMapper mapper)
     {
         _logRepo = logRepo;
@@ -28,6 +28,7 @@ public class ArchiveLogsController : ControllerBase
         _userRepo = userRepo;
         _mapper = mapper;
     }
+
 
     /// <summary>
     /// Получает список логов с пагинацией и фильтрацией

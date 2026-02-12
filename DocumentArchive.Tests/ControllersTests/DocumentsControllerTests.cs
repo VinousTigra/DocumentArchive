@@ -1,8 +1,8 @@
 using AutoMapper;
 using DocumentArchive.API.Controllers;
 using DocumentArchive.Core.DTOs.Document;
+using DocumentArchive.Core.Interfaces;
 using DocumentArchive.Core.Models;
-using DocumentArchive.Infrastructure.Repositories;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
@@ -11,19 +11,19 @@ namespace DocumentArchive.Tests.ControllersTests;
 
 public class DocumentsControllerTests
 {
-    private readonly Mock<DocumentRepository> _documentRepoMock;
-    private readonly Mock<CategoryRepository> _categoryRepoMock;
-    private readonly Mock<UserRepository> _userRepoMock;
-    private readonly Mock<ArchiveLogRepository> _logRepoMock;
+    private readonly Mock<IDocumentRepository> _documentRepoMock;
+    private readonly Mock<ICategoryRepository> _categoryRepoMock;
+    private readonly Mock<IUserRepository> _userRepoMock;
+    private readonly Mock<IArchiveLogRepository> _logRepoMock;
     private readonly Mock<IMapper> _mapperMock;
     private readonly DocumentsController _controller;
 
     public DocumentsControllerTests()
     {
-        _documentRepoMock = new Mock<DocumentRepository>();
-        _categoryRepoMock = new Mock<CategoryRepository>();
-        _userRepoMock = new Mock<UserRepository>();
-        _logRepoMock = new Mock<ArchiveLogRepository>();
+        _documentRepoMock = new Mock<IDocumentRepository>();
+        _categoryRepoMock = new Mock<ICategoryRepository>();
+        _userRepoMock = new Mock<IUserRepository>();
+        _logRepoMock = new Mock<IArchiveLogRepository>();
         _mapperMock = new Mock<IMapper>();
         _controller = new DocumentsController(
             _documentRepoMock.Object,

@@ -1,8 +1,8 @@
 using AutoMapper;
 using DocumentArchive.API.Controllers;
 using DocumentArchive.Core.DTOs.ArchiveLog;
+using DocumentArchive.Core.Interfaces;
 using DocumentArchive.Core.Models;
-using DocumentArchive.Infrastructure.Repositories;
 using FluentAssertions;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
@@ -11,17 +11,17 @@ namespace DocumentArchive.Tests.ControllersTests;
 
 public class ArchiveLogsControllerTests
 {
-    private readonly Mock<ArchiveLogRepository> _logRepoMock;
-    private readonly Mock<DocumentRepository> _documentRepoMock;
-    private readonly Mock<UserRepository> _userRepoMock;
+    private readonly Mock<IArchiveLogRepository> _logRepoMock;
+    private readonly Mock<IDocumentRepository> _documentRepoMock;
+    private readonly Mock<IUserRepository> _userRepoMock;
     private readonly Mock<IMapper> _mapperMock;
     private readonly ArchiveLogsController _controller;
 
     public ArchiveLogsControllerTests()
     {
-        _logRepoMock = new Mock<ArchiveLogRepository>();
-        _documentRepoMock = new Mock<DocumentRepository>();
-        _userRepoMock = new Mock<UserRepository>();
+        _logRepoMock = new Mock<IArchiveLogRepository>();
+        _documentRepoMock = new Mock<IDocumentRepository>();
+        _userRepoMock = new Mock<IUserRepository>();
         _mapperMock = new Mock<IMapper>();
         _controller = new ArchiveLogsController(
             _logRepoMock.Object,
@@ -47,6 +47,7 @@ public class ArchiveLogsControllerTests
         var okResult = result.Result as OkObjectResult;
         okResult.Should().NotBeNull();
         okResult!.StatusCode.Should().Be(200);
+        okResult.Value.Should().Be(responseDto);
     }
 
     [Fact]
@@ -68,6 +69,7 @@ public class ArchiveLogsControllerTests
         var responseDto = new ArchiveLogResponseDto { Id = log.Id };
         _mapperMock.Setup(x => x.Map<ArchiveLog>(createDto)).Returns(log);
         _mapperMock.Setup(x => x.Map<ArchiveLogResponseDto>(log)).Returns(responseDto);
+        _logRepoMock.Setup(x => x.AddAsync(log)).Returns(Task.CompletedTask);
 
         // Act
         var result = await _controller.Create(createDto);

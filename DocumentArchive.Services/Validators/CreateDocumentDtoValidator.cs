@@ -1,15 +1,17 @@
 ﻿using DocumentArchive.Core.DTOs.Document;
-using DocumentArchive.Infrastructure.Repositories;
+using DocumentArchive.Core.Interfaces;      // <-- добавить
 using FluentValidation;
 
 namespace DocumentArchive.Services.Validators;
 
 public class CreateDocumentDtoValidator : AbstractValidator<CreateDocumentDto>
 {
-    private readonly CategoryRepository _categoryRepo;
-    private readonly UserRepository _userRepo;
+    private readonly ICategoryRepository _categoryRepo;   // <-- интерфейс
+    private readonly IUserRepository _userRepo;           // <-- интерфейс
 
-    public CreateDocumentDtoValidator(CategoryRepository categoryRepo, UserRepository userRepo)
+    public CreateDocumentDtoValidator(
+        ICategoryRepository categoryRepo,    // <-- интерфейс
+        IUserRepository userRepo)           // <-- интерфейс
     {
         _categoryRepo = categoryRepo;
         _userRepo = userRepo;

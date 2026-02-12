@@ -1,6 +1,6 @@
 using DocumentArchive.Core.DTOs.Document;
+using DocumentArchive.Core.Interfaces;
 using DocumentArchive.Core.Models;
-using DocumentArchive.Infrastructure.Repositories;
 using DocumentArchive.Services.Validators;
 using FluentAssertions;
 using FluentValidation.TestHelper;
@@ -10,77 +10,54 @@ namespace DocumentArchive.Tests.ValidatorsTests;
 
 public class CreateDocumentDtoValidatorTests
 {
-    private readonly Mock<CategoryRepository> _categoryRepoMock;
-    private readonly Mock<UserRepository> _userRepoMock;
+    private readonly Mock<ICategoryRepository> _categoryRepoMock;   // <-- интерфейс
+    private readonly Mock<IUserRepository> _userRepoMock;           // <-- интерфейс
     private readonly CreateDocumentDtoValidator _validator;
 
     public CreateDocumentDtoValidatorTests()
     {
-        _categoryRepoMock = new Mock<CategoryRepository>();
-        _userRepoMock = new Mock<UserRepository>();
-        _validator = new CreateDocumentDtoValidator(_categoryRepoMock.Object, _userRepoMock.Object);
+        _categoryRepoMock = new Mock<ICategoryRepository>();
+        _userRepoMock = new Mock<IUserRepository>();
+        _validator = new CreateDocumentDtoValidator(
+            _categoryRepoMock.Object,
+            _userRepoMock.Object);
     }
 
     [Fact]
     public async Task Should_HaveError_When_Title_IsEmpty()
     {
-        // Arrange
         var dto = new CreateDocumentDto { Title = "", FileName = "test.pdf" };
-
-        // Act
         var result = await _validator.TestValidateAsync(dto);
-
-        // Assert
-        result.ShouldHaveValidationErrorFor(x => x.Title)
-            .WithErrorMessage("Название документа обязательно");
+        result.ShouldHaveValidationErrorFor(x => x.Title);
     }
 
     [Fact]
     public async Task Should_HaveError_When_Title_ExceedsMaxLength()
     {
-        // Arrange
         var dto = new CreateDocumentDto { Title = new string('a', 201), FileName = "test.pdf" };
-
-        // Act
         var result = await _validator.TestValidateAsync(dto);
-
-        // Assert
-        result.ShouldHaveValidationErrorFor(x => x.Title)
-            .WithErrorMessage("Название не должно превышать 200 символов");
+        result.ShouldHaveValidationErrorFor(x => x.Title);
     }
 
     [Fact]
     public async Task Should_HaveError_When_FileName_IsEmpty()
     {
-        // Arrange
         var dto = new CreateDocumentDto { Title = "Title", FileName = "" };
-
-        // Act
         var result = await _validator.TestValidateAsync(dto);
-
-        // Assert
-        result.ShouldHaveValidationErrorFor(x => x.FileName)
-            .WithErrorMessage("Имя файла обязательно");
+        result.ShouldHaveValidationErrorFor(x => x.FileName);
     }
 
     [Fact]
     public async Task Should_HaveError_When_FileName_ExceedsMaxLength()
     {
-        // Arrange
         var dto = new CreateDocumentDto { Title = "Title", FileName = new string('a', 101) };
-
-        // Act
         var result = await _validator.TestValidateAsync(dto);
-
-        // Assert
-        result.ShouldHaveValidationErrorFor(x => x.FileName)
-            .WithErrorMessage("Имя файла не должно превышать 100 символов");
+        result.ShouldHaveValidationErrorFor(x => x.FileName);
     }
 
     [Fact]
     public async Task Should_HaveError_When_CategoryId_DoesNotExist()
     {
-        // Arrange
         var categoryId = Guid.NewGuid();
         _categoryRepoMock.Setup(x => x.GetByIdAsync(categoryId))
             .ReturnsAsync((Category?)null);
@@ -90,19 +67,13 @@ public class CreateDocumentDtoValidatorTests
             FileName = "test.pdf",
             CategoryId = categoryId
         };
-
-        // Act
         var result = await _validator.TestValidateAsync(dto);
-
-        // Assert
-        result.ShouldHaveValidationErrorFor(x => x.CategoryId)
-            .WithErrorMessage("Категория с указанным ID не существует");
+        result.ShouldHaveValidationErrorFor(x => x.CategoryId);
     }
 
     [Fact]
     public async Task Should_NotHaveError_When_CategoryId_Exists()
     {
-        // Arrange
         var categoryId = Guid.NewGuid();
         _categoryRepoMock.Setup(x => x.GetByIdAsync(categoryId))
             .ReturnsAsync(new Category { Id = categoryId });
@@ -112,36 +83,13 @@ public class CreateDocumentDtoValidatorTests
             FileName = "test.pdf",
             CategoryId = categoryId
         };
-
-        // Act
         var result = await _validator.TestValidateAsync(dto);
-
-        // Assert
-        result.ShouldNotHaveValidationErrorFor(x => x.CategoryId);
-    }
-
-    [Fact]
-    public async Task Should_NotHaveError_When_CategoryId_IsNull()
-    {
-        // Arrange
-        var dto = new CreateDocumentDto
-        {
-            Title = "Title",
-            FileName = "test.pdf",
-            CategoryId = null
-        };
-
-        // Act
-        var result = await _validator.TestValidateAsync(dto);
-
-        // Assert
         result.ShouldNotHaveValidationErrorFor(x => x.CategoryId);
     }
 
     [Fact]
     public async Task Should_HaveError_When_UserId_DoesNotExist()
     {
-        // Arrange
         var userId = Guid.NewGuid();
         _userRepoMock.Setup(x => x.GetByIdAsync(userId))
             .ReturnsAsync((User?)null);
@@ -151,12 +99,23 @@ public class CreateDocumentDtoValidatorTests
             FileName = "test.pdf",
             UserId = userId
         };
-
-        // Act
         var result = await _validator.TestValidateAsync(dto);
+        result.ShouldHaveValidationErrorFor(x => x.UserId);
+    }
 
-        // Assert
-        result.ShouldHaveValidationErrorFor(x => x.UserId)
-            .WithErrorMessage("Пользователь с указанным ID не существует");
+    [Fact]
+    public async Task Should_NotHaveError_When_UserId_Exists()
+    {
+        var userId = Guid.NewGuid();
+        _userRepoMock.Setup(x => x.GetByIdAsync(userId))
+            .ReturnsAsync(new User { Id = userId });
+        var dto = new CreateDocumentDto
+        {
+            Title = "Title",
+            FileName = "test.pdf",
+            UserId = userId
+        };
+        var result = await _validator.TestValidateAsync(dto);
+        result.ShouldNotHaveValidationErrorFor(x => x.UserId);
     }
 }

@@ -1,10 +1,12 @@
-﻿using DocumentArchive.Core.Models;
+﻿using DocumentArchive.Core.Interfaces;
+using DocumentArchive.Core.Models;
 
 namespace DocumentArchive.Infrastructure.Repositories;
 
-public class DocumentRepository : FileStorageRepository<Document>
+public class DocumentRepository : FileStorageRepository<Document>, IDocumentRepository
 {
-    public DocumentRepository() : base("documents.json", d => d.Id)
+    public DocumentRepository(string? dataDirectory = null)
+        : base("documents.json", d => d.Id, dataDirectory)
     {
     }
 

@@ -1,14 +1,14 @@
 ﻿using DocumentArchive.Core.DTOs.User;
-using DocumentArchive.Infrastructure.Repositories;
+using DocumentArchive.Core.Interfaces;
 using FluentValidation;
 
 namespace DocumentArchive.Services.Validators;
 
 public class CreateUserDtoValidator : AbstractValidator<CreateUserDto>
 {
-    private readonly UserRepository _userRepo;
+    private readonly IUserRepository _userRepo;
 
-    public CreateUserDtoValidator(UserRepository userRepo)
+    public CreateUserDtoValidator(IUserRepository userRepo)
     {
         _userRepo = userRepo;
 

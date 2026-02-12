@@ -1,14 +1,14 @@
 ﻿using DocumentArchive.Core.DTOs.Category;
-using DocumentArchive.Infrastructure.Repositories;
+using DocumentArchive.Core.Interfaces;
 using FluentValidation;
 
 namespace DocumentArchive.Services.Validators;
 
 public class CreateCategoryDtoValidator : AbstractValidator<CreateCategoryDto>
 {
-    private readonly CategoryRepository _categoryRepo;
+    private readonly ICategoryRepository _categoryRepo;
 
-    public CreateCategoryDtoValidator(CategoryRepository categoryRepo)
+    public CreateCategoryDtoValidator(ICategoryRepository categoryRepo)
     {
         _categoryRepo = categoryRepo;
 

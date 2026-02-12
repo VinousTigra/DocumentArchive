@@ -1,14 +1,14 @@
-﻿using DocumentArchive.Core.DTOs.Document;   // <-- ЭТО ВАЖНО!
-using DocumentArchive.Infrastructure.Repositories;
+﻿using DocumentArchive.Core.DTOs.Document;
+using DocumentArchive.Core.Interfaces;
 using FluentValidation;
 
 namespace DocumentArchive.Services.Validators;
 
 public class UpdateDocumentDtoValidator : AbstractValidator<UpdateDocumentDto>
 {
-    private readonly CategoryRepository _categoryRepo;
+    private readonly ICategoryRepository _categoryRepo;
 
-    public UpdateDocumentDtoValidator(CategoryRepository categoryRepo)
+    public UpdateDocumentDtoValidator(ICategoryRepository categoryRepo)
     {
         _categoryRepo = categoryRepo;
 

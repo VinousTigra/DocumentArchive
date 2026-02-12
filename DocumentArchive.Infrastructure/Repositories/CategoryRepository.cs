@@ -1,10 +1,12 @@
-﻿using DocumentArchive.Core.Models;
+﻿using DocumentArchive.Core.Interfaces;
+using DocumentArchive.Core.Models;
 
 namespace DocumentArchive.Infrastructure.Repositories;
 
-public class CategoryRepository : FileStorageRepository<Category>
+public class CategoryRepository : FileStorageRepository<Category>, ICategoryRepository
 {
-    public CategoryRepository() : base("categories.json", c => c.Id)
+    public CategoryRepository(string? dataDirectory = null)
+        : base("categories.json", c => c.Id, dataDirectory)
     {
     }
 
