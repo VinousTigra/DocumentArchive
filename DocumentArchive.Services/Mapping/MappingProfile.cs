@@ -15,6 +15,8 @@ public class MappingProfile : Profile
         CreateMap<CreateDocumentDto, Document>();
         CreateMap<UpdateDocumentDto, Document>()
             .ForAllMembers(opts => opts.Condition((src, dest, srcMember) => srcMember != null));
+        CreateMap<UpdateBulkDocumentDto, Document>()
+            .ForAllMembers(opts => opts.Condition((src, dest, srcMember) => srcMember != null));
         CreateMap<Document, DocumentResponseDto>()
             .ForMember(dest => dest.CategoryName,
                 opt => opt.MapFrom(src => src.Category != null ? src.Category.Name : null))
@@ -39,6 +41,7 @@ public class MappingProfile : Profile
         CreateMap<Category, CategoryListItemDto>();
 
         // ========== ArchiveLog ==========
+        CreateMap<CreateArchiveLogDto, ArchiveLog>();
         CreateMap<ArchiveLog, ArchiveLogResponseDto>()
             .ForMember(dest => dest.UserName,
                 opt => opt.MapFrom(src => src.User != null ? src.User.Username : null))

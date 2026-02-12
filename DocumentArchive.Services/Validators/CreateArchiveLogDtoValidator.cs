@@ -18,6 +18,9 @@ public class CreateArchiveLogDtoValidator : AbstractValidator<CreateArchiveLogDt
             .NotEmpty().WithMessage("Действие обязательно")
             .MaximumLength(50).WithMessage("Действие не должно превышать 50 символов");
 
+        RuleFor(x => x.ActionType)
+            .IsInEnum().WithMessage("Некорректный тип действия");
+
         RuleFor(x => x.DocumentId)
             .NotEmpty().WithMessage("ID документа обязателен")
             .MustAsync(async (id, cancellation) =>

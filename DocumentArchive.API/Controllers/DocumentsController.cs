@@ -34,17 +34,16 @@ public class DocumentsController : ControllerBase
     }
 
     /// <summary>
-    /// Получает список документов с пагинацией, фильтрацией, поиском и сортировкой
+    /// Получает список документов с пагинацией, фильтрацией, поиском и множественной сортировкой
     /// </summary>
     /// <param name="page">Номер страницы (по умолч. 1)</param>
     /// <param name="pageSize">Размер страницы (по умолч. 10)</param>
     /// <param name="search">Поисковый запрос (по названию и описанию)</param>
-    /// <param name="categoryId">Фильтр по категории</param>
+    /// <param name="categoryIds">Фильтр по нескольким категориям (ID через запятую)</param>
     /// <param name="userId">Фильтр по пользователю</param>
     /// <param name="fromDate">Фильтр по дате загрузки (от)</param>
     /// <param name="toDate">Фильтр по дате загрузки (до)</param>
-    /// <param name="sortBy">Поле для сортировки (title, uploadDate)</param>
-    /// <param name="sortOrder">Направление сортировки (asc, desc)</param>
+    /// <param name="sort">Поля для сортировки, например: title:asc,uploadDate:desc</param>
     /// <returns>Страница с документами</returns>
     /// <response code="200">Успешно возвращён список</response>
     [HttpGet]
@@ -53,16 +52,15 @@ public class DocumentsController : ControllerBase
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 10,
         [FromQuery] string? search = null,
-        [FromQuery] Guid? categoryId = null,
+        [FromQuery] string? categoryIds = null,
         [FromQuery] Guid? userId = null,
         [FromQuery] DateTime? fromDate = null,
         [FromQuery] DateTime? toDate = null,
-        [FromQuery] string? sortBy = "uploadDate",
-        [FromQuery] string? sortOrder = "desc")
+        [FromQuery] string? sort = null)
     {
         var documents = await _documentRepo.GetAllAsync();
 
-        // Фильтрация
+        // ---- Фильтрация ----
         if (!string.IsNullOrWhiteSpace(search))
         {
             search = search.ToLowerInvariant();
@@ -71,8 +69,17 @@ public class DocumentsController : ControllerBase
                 (d.Description?.ToLowerInvariant().Contains(search) ?? false));
         }
 
-        if (categoryId.HasValue)
-            documents = documents.Where(d => d.CategoryId == categoryId);
+        if (!string.IsNullOrWhiteSpace(categoryIds))
+        {
+            var ids = categoryIds.Split(',')
+                .Select(id => Guid.TryParse(id.Trim(), out var g) ? g : (Guid?)null)
+                .Where(g => g.HasValue)
+                .Select(g => g.Value)
+                .ToList();
+            if (ids.Any())
+                documents = documents.Where(d => d.CategoryId.HasValue && ids.Contains(d.CategoryId.Value));
+        }
+
         if (userId.HasValue)
             documents = documents.Where(d => d.UserId == userId);
         if (fromDate.HasValue)
@@ -80,19 +87,41 @@ public class DocumentsController : ControllerBase
         if (toDate.HasValue)
             documents = documents.Where(d => d.UploadDate <= toDate.Value);
 
-        // Сортировка
-        documents = sortBy?.ToLowerInvariant() switch
+        // ---- Множественная сортировка ----
+        if (!string.IsNullOrWhiteSpace(sort))
         {
-            "title" => sortOrder == "asc"
-                ? documents.OrderBy(d => d.Title)
-                : documents.OrderByDescending(d => d.Title),
-            "uploaddate" => sortOrder == "asc"
-                ? documents.OrderBy(d => d.UploadDate)
-                : documents.OrderByDescending(d => d.UploadDate),
-            _ => documents.OrderByDescending(d => d.UploadDate)
-        };
+            var sortFields = sort.Split(',');
+            IOrderedEnumerable<Document>? ordered = null;
 
-        // Пагинация
+            foreach (var field in sortFields)
+            {
+                var parts = field.Split(':');
+                var fieldName = parts[0].Trim().ToLowerInvariant();
+                var direction = parts.Length > 1 ? parts[1].Trim().ToLowerInvariant() : "asc";
+
+                if (ordered == null)
+                {
+                    ordered = direction == "asc"
+                        ? documents.OrderBy(GetSortProperty(fieldName))
+                        : documents.OrderByDescending(GetSortProperty(fieldName));
+                }
+                else
+                {
+                    ordered = direction == "asc"
+                        ? ordered.ThenBy(GetSortProperty(fieldName))
+                        : ordered.ThenByDescending(GetSortProperty(fieldName));
+                }
+            }
+
+            if (ordered != null)
+                documents = ordered;
+        }
+        else
+        {
+            documents = documents.OrderByDescending(d => d.UploadDate);
+        }
+
+        // ---- Пагинация ----
         var totalCount = documents.Count();
         var items = documents
             .Skip((page - 1) * pageSize)
@@ -111,13 +140,17 @@ public class DocumentsController : ControllerBase
         return Ok(result);
     }
 
+    private static Func<Document, object> GetSortProperty(string fieldName) => fieldName switch
+    {
+        "title" => d => d.Title,
+        "uploaddate" => d => d.UploadDate,
+        "filename" => d => d.FileName,
+        _ => d => d.UploadDate
+    };
+
     /// <summary>
     /// Получает документ по уникальному идентификатору
     /// </summary>
-    /// <param name="id">GUID документа</param>
-    /// <returns>Полная информация о документе</returns>
-    /// <response code="200">Документ найден</response>
-    /// <response code="404">Документ не существует</response>
     [HttpGet("{id}")]
     [ProducesResponseType(typeof(DocumentResponseDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -134,10 +167,6 @@ public class DocumentsController : ControllerBase
     /// <summary>
     /// Создаёт новый документ
     /// </summary>
-    /// <param name="createDto">Данные для создания документа</param>
-    /// <returns>Созданный документ</returns>
-    /// <response code="201">Документ успешно создан</response>
-    /// <response code="400">Ошибка валидации или не найдена связанная сущность</response>
     [HttpPost]
     [ProducesResponseType(typeof(DocumentResponseDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -172,6 +201,8 @@ public class DocumentsController : ControllerBase
             {
                 Id = Guid.NewGuid(),
                 Action = "Created",
+                ActionType = ActionType.Created,
+                IsCritical = false,
                 Timestamp = DateTime.UtcNow,
                 UserId = createDto.UserId.Value,
                 DocumentId = document.Id
@@ -186,12 +217,6 @@ public class DocumentsController : ControllerBase
     /// <summary>
     /// Полностью обновляет документ
     /// </summary>
-    /// <param name="id">GUID документа</param>
-    /// <param name="updateDto">Новые данные документа</param>
-    /// <returns>Нет содержимого</returns>
-    /// <response code="204">Обновление выполнено успешно</response>
-    /// <response code="404">Документ не найден</response>
-    /// <response code="400">Указанная категория не существует</response>
     [HttpPut("{id}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -202,7 +227,6 @@ public class DocumentsController : ControllerBase
         if (existing == null)
             return NotFound();
 
-        // Проверка категории
         if (updateDto.CategoryId.HasValue)
         {
             var category = await _categoryRepo.GetByIdAsync(updateDto.CategoryId.Value);
@@ -220,10 +244,6 @@ public class DocumentsController : ControllerBase
     /// <summary>
     /// Удаляет документ
     /// </summary>
-    /// <param name="id">GUID документа</param>
-    /// <returns>Нет содержимого</returns>
-    /// <response code="204">Удаление выполнено успешно</response>
-    /// <response code="404">Документ не найден</response>
     [HttpDelete("{id}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -238,50 +258,101 @@ public class DocumentsController : ControllerBase
     }
 
     /// <summary>
-    /// Массовое создание документов
+    /// Массовое создание документов с детальным ответом
     /// </summary>
-    /// <param name="createDtos">Список документов для создания</param>
-    /// <returns>Количество созданных документов</returns>
-    /// <response code="200">Успешно созданы</response>
     [HttpPost("bulk")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> CreateBulk([FromBody] List<CreateDocumentDto> createDtos)
     {
-        var documents = _mapper.Map<List<Document>>(createDtos);
-        foreach (var doc in documents)
+        var results = new List<object>();
+
+        foreach (var dto in createDtos)
         {
-            doc.Id = Guid.NewGuid();
-            doc.UploadDate = DateTime.UtcNow;
-            await _documentRepo.AddAsync(doc);
+            try
+            {
+                var document = _mapper.Map<Document>(dto);
+                document.Id = Guid.NewGuid();
+                document.UploadDate = DateTime.UtcNow;
+                await _documentRepo.AddAsync(document);
+                results.Add(new { id = document.Id, success = true });
+            }
+            catch (Exception ex)
+            {
+                results.Add(new { id = (Guid?)null, success = false, error = ex.Message });
+            }
         }
-        return Ok(new { count = documents.Count });
+
+        return Ok(new { count = results.Count, results });
     }
 
     /// <summary>
-    /// Массовое удаление документов
+    /// Массовое удаление документов с детальным ответом
     /// </summary>
-    /// <param name="ids">Строка с GUID через запятую</param>
-    /// <returns>Нет содержимого</returns>
-    /// <response code="204">Удаление выполнено</response>
     [HttpDelete("bulk")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> DeleteBulk([FromQuery] string ids)
     {
-        var guidList = ids.Split(',').Select(id => Guid.Parse(id.Trim())).ToList();
+        var guidList = ids.Split(',')
+            .Select(id => Guid.TryParse(id.Trim(), out var g) ? g : (Guid?)null)
+            .Where(g => g.HasValue)
+            .Select(g => g.Value)
+            .ToList();
+
+        var results = new List<object>();
+
         foreach (var id in guidList)
         {
-            await _documentRepo.DeleteAsync(id);
+            try
+            {
+                await _documentRepo.DeleteAsync(id);
+                results.Add(new { id, success = true });
+            }
+            catch (Exception ex)
+            {
+                results.Add(new { id, success = false, error = ex.Message });
+            }
         }
-        return NoContent();
+
+        return Ok(new { count = results.Count, results });
+    }
+
+    /// <summary>
+    /// Массовое обновление документов
+    /// </summary>
+    [HttpPut("bulk")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> UpdateBulk([FromBody] List<UpdateBulkDocumentDto> updateDtos)
+    {
+        var results = new List<object>();
+
+        foreach (var dto in updateDtos)
+        {
+            try
+            {
+                var existing = await _documentRepo.GetByIdAsync(dto.Id);
+                if (existing == null)
+                {
+                    results.Add(new { id = dto.Id, success = false, error = "Document not found" });
+                    continue;
+                }
+
+                _mapper.Map(dto, existing);
+                existing.UpdatedAt = DateTime.UtcNow;
+                await _documentRepo.UpdateAsync(existing);
+                results.Add(new { id = dto.Id, success = true });
+            }
+            catch (Exception ex)
+            {
+                results.Add(new { id = dto.Id, success = false, error = ex.Message });
+            }
+        }
+
+        return Ok(new { count = results.Count, results });
     }
 
     /// <summary>
     /// Получает историю операций с документом
     /// </summary>
-    /// <param name="id">GUID документа</param>
-    /// <returns>Список логов</returns>
-    /// <response code="200">Успешно</response>
-    /// <response code="404">Документ не найден</response>
     [HttpGet("{id}/logs")]
     [ProducesResponseType(typeof(IEnumerable<ArchiveLogListItemDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]

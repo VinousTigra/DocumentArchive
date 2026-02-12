@@ -1,4 +1,4 @@
-﻿using DocumentArchive.Core.DTOs.Document;
+﻿using DocumentArchive.Core.DTOs.Document;   // <-- ЭТО ВАЖНО!
 using DocumentArchive.Infrastructure.Repositories;
 using FluentValidation;
 

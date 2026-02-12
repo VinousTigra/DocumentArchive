@@ -1,7 +1,8 @@
 ﻿namespace DocumentArchive.Core.DTOs.Document;
 
-public class UpdateDocumentDto
+public class UpdateBulkDocumentDto
 {
+    public Guid Id { get; set; }
     public string? Title { get; set; }
     public string? Description { get; set; }
     public string? FileName { get; set; }

@@ -40,7 +40,9 @@ public class ArchiveLogsController : ControllerBase
         [FromQuery] Guid? documentId = null,
         [FromQuery] Guid? userId = null,
         [FromQuery] DateTime? fromDate = null,
-        [FromQuery] DateTime? toDate = null)
+        [FromQuery] DateTime? toDate = null,
+        [FromQuery] ActionType? actionType = null,
+        [FromQuery] bool? isCritical = null)
     {
         var logs = await _logRepo.GetAllAsync();
 
@@ -52,6 +54,10 @@ public class ArchiveLogsController : ControllerBase
             logs = logs.Where(l => l.Timestamp >= fromDate.Value);
         if (toDate.HasValue)
             logs = logs.Where(l => l.Timestamp <= toDate.Value);
+        if (actionType.HasValue)
+            logs = logs.Where(l => l.ActionType == actionType.Value);
+        if (isCritical.HasValue)
+            logs = logs.Where(l => l.IsCritical == isCritical.Value);
 
         logs = logs.OrderByDescending(l => l.Timestamp);
 
