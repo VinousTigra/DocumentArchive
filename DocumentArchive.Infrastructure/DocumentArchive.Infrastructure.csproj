@@ -2,6 +2,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\DocumentArchive.Core\DocumentArchive.Core.csproj" />
+        
     </ItemGroup>
 
     <ItemGroup>
@@ -14,6 +15,7 @@
 
     <PropertyGroup>
         <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
+        
     </PropertyGroup>
 
     <PropertyGroup>

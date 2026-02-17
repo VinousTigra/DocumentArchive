@@ -1,26 +1,29 @@
 using DocumentArchive.Infrastructure.DependencyInjection;
 using DocumentArchive.Services.DependencyInjection;
-using FluentValidation.AspNetCore;
+using FluentValidation.AspNetCore; 
 using Scalar.AspNetCore;
-
-
-
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Настройка контроллеров и JSON-сериализации
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.WriteIndented = true;
     });
 
-// Передаём Configuration в метод расширения
-builder.Services.AddInfrastructure((IConfiguration)builder.Configuration);
+// регистрация FluentValidation
+builder.Services.AddFluentValidationAutoValidation();
+builder.Services.AddFluentValidationClientsideAdapters();
+
+// Передаём конфигурацию в метод расширения Infrastructure 
+builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddServices();
 
+// Настройка OpenAPI (Scalar)
 builder.Services.AddOpenApi(options =>
 {
-    options.AddDocumentTransformer((document, context, cancellationToken) =>
+    options.AddDocumentTransformer((document, _, _) => // неиспользуемые параметры заменены на _
     {
         document.Info = new()
         {
@@ -43,7 +46,6 @@ if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
     app.MapScalarApiReference();
-    // Добавляем лог со ссылкой
     app.Logger.LogInformation("Scalar UI доступен по адресу http://localhost:5041/scalar/v1");
 }
 
