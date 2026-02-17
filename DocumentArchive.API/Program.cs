@@ -9,13 +9,16 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Добавляем контроллеры с FluentValidation и настройками JSON
 builder.Services.AddControllers()
-    .AddFluentValidation() // автоматическая валидация через FluentValidation
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.WriteIndented = true; // красивое форматирование JSON
     });
 
-// Регистрация слоя Infrastructure (репозитории и опции)
+// регистрация FluentValidation
+builder.Services.AddFluentValidationAutoValidation();
+builder.Services.AddFluentValidationClientsideAdapters();
+
+// Передаём конфигурацию в метод расширения Infrastructure 
 builder.Services.AddInfrastructure(builder.Configuration);
 
 // Регистрация слоя Services (AutoMapper, валидаторы, сервисы)
