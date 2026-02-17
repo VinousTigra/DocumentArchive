@@ -1,5 +1,4 @@
 ﻿using DocumentArchive.Core.DTOs.Shared;
-using DocumentArchive.Core.Interfaces;
 using DocumentArchive.Core.Interfaces.Repositorys;
 using DocumentArchive.Core.Models;
 using DocumentArchive.Infrastructure.Configuration;
@@ -43,20 +42,6 @@ public class ArchiveLogRepository : FileStorageRepository<ArchiveLog>, IArchiveL
         throw new NotImplementedException();
     }
 
-    public Task<ArchiveLog?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
-    {
-        throw new NotImplementedException();
-    }
-
-    public Task AddAsync(ArchiveLog entity, CancellationToken cancellationToken = default)
-    {
-        throw new NotImplementedException();
-    }
-
-    public Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
-    {
-        throw new NotImplementedException();
-    }
 
     public Task<IEnumerable<ArchiveLog>> GetByDocumentIdAsync(Guid documentId, CancellationToken cancellationToken = default)
     {

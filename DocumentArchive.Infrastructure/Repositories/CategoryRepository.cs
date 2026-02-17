@@ -1,5 +1,4 @@
 ﻿using DocumentArchive.Core.DTOs.Shared;
-using DocumentArchive.Core.Interfaces;
 using DocumentArchive.Core.Interfaces.Repositorys;
 using DocumentArchive.Core.Models;
 using DocumentArchive.Infrastructure.Configuration;
@@ -37,27 +36,24 @@ public class CategoryRepository : FileStorageRepository<Category>, ICategoryRepo
         throw new NotImplementedException();
     }
 
-    public Task<Category?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
-    {
-        throw new NotImplementedException();
-    }
+
 
     public Task<Category?> FindByNameAsync(string name, CancellationToken cancellationToken = default)
     {
         throw new NotImplementedException();
     }
 
-    public Task AddAsync(Category entity, CancellationToken cancellationToken = default)
+    public new Task AddAsync(Category entity, CancellationToken cancellationToken = default)
     {
         throw new NotImplementedException();
     }
 
-    public Task UpdateAsync(Category entity, CancellationToken cancellationToken = default)
+    public new Task UpdateAsync(Category entity, CancellationToken cancellationToken = default)
     {
         throw new NotImplementedException();
     }
 
-    public Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
+    public new Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
     {
         throw new NotImplementedException();
     }

@@ -27,20 +27,8 @@ public class DocumentRepository : FileStorageRepository<Document>, IDocumentRepo
         throw new NotImplementedException();
     }
 
-    public Task AddAsync(Document entity, CancellationToken cancellationToken = default)
-    {
-        throw new NotImplementedException();
-    }
 
-    public Task UpdateAsync(Document entity, CancellationToken cancellationToken = default)
-    {
-        throw new NotImplementedException();
-    }
 
-    public Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
-    {
-        throw new NotImplementedException();
-    }
 
     public Task<IEnumerable<Document>> GetByCategoryAsync(Guid categoryId, CancellationToken cancellationToken = default)
     {

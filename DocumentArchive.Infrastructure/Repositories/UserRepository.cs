@@ -1,5 +1,4 @@
 ﻿using DocumentArchive.Core.DTOs.Shared;
-using DocumentArchive.Core.Interfaces;
 using DocumentArchive.Core.Interfaces.Repositorys;
 using DocumentArchive.Core.Models;
 using DocumentArchive.Infrastructure.Configuration;
@@ -41,11 +40,6 @@ public class UserRepository : FileStorageRepository<User>, IUserRepository
         throw new NotImplementedException();
     }
 
-    public Task<User?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
-    {
-        throw new NotImplementedException();
-    }
-
     public Task<User?> FindByEmailAsync(string email, CancellationToken cancellationToken = default)
     {
         throw new NotImplementedException();
@@ -55,19 +49,5 @@ public class UserRepository : FileStorageRepository<User>, IUserRepository
     {
         throw new NotImplementedException();
     }
-
-    public Task AddAsync(User entity, CancellationToken cancellationToken = default)
-    {
-        throw new NotImplementedException();
-    }
-
-    public Task UpdateAsync(User entity, CancellationToken cancellationToken = default)
-    {
-        throw new NotImplementedException();
-    }
-
-    public Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
-    {
-        throw new NotImplementedException();
-    }
+    
 }
