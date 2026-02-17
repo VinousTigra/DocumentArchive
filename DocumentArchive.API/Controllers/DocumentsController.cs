@@ -1,8 +1,8 @@
-﻿using AutoMapper;
-using DocumentArchive.Core.DTOs.ArchiveLog;
+﻿using DocumentArchive.Core.DTOs.ArchiveLog;
 using DocumentArchive.Core.DTOs.Document;
 using DocumentArchive.Core.DTOs.Shared;
 using DocumentArchive.Core.Interfaces.Services;
+using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 
 namespace DocumentArchive.API.Controllers;
@@ -13,12 +13,20 @@ namespace DocumentArchive.API.Controllers;
 public class DocumentsController : ControllerBase
 {
     private readonly IDocumentService _documentService;
+    private readonly IValidator<CreateDocumentDto> _createValidator;
+    private readonly IValidator<UpdateDocumentDto> _updateValidator;
     private readonly ILogger<DocumentsController> _logger;
     private const int MaxBulkSize = 100;
 
-    public DocumentsController(IDocumentService documentService, ILogger<DocumentsController> logger)
+    public DocumentsController(
+        IDocumentService documentService,
+        IValidator<CreateDocumentDto> createValidator,
+        IValidator<UpdateDocumentDto> updateValidator,
+        ILogger<DocumentsController> logger)
     {
         _documentService = documentService;
+        _createValidator = createValidator;
+        _updateValidator = updateValidator;
         _logger = logger;
     }
 
@@ -33,12 +41,12 @@ public class DocumentsController : ControllerBase
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 10,
         [FromQuery] string? search = null,
-        [FromQuery] Guid[]? categoryIds = null,          // массив GUID
+        [FromQuery] Guid[]? categoryIds = null,
         [FromQuery] Guid? userId = null,
         [FromQuery] DateTime? fromDate = null,
         [FromQuery] DateTime? toDate = null,
         [FromQuery] string? sort = null,
-        CancellationToken cancellationToken = default)    // добавлен токен
+        CancellationToken cancellationToken = default)
     {
         // Валидация параметров
         if (page < 1)
@@ -48,7 +56,7 @@ public class DocumentsController : ControllerBase
         if (fromDate.HasValue && toDate.HasValue && fromDate > toDate)
             return BadRequest("fromDate cannot be later than toDate.");
 
-        // Проверка формата сортировки (простая проверка)
+        // Простая проверка формата сортировки
         if (!string.IsNullOrWhiteSpace(sort) && !IsValidSortFormat(sort))
             return BadRequest("Invalid sort format. Expected format: field:direction,field:direction (e.g., title:asc,uploadDate:desc)");
 
@@ -61,7 +69,7 @@ public class DocumentsController : ControllerBase
         catch (OperationCanceledException)
         {
             _logger.LogInformation("Request cancelled by client");
-            return StatusCode(499, "Request cancelled"); // 499 - Client Closed Request (неофициально)
+            return StatusCode(499, "Request cancelled");
         }
         catch (Exception ex)
         {
@@ -108,8 +116,12 @@ public class DocumentsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<DocumentResponseDto>> Create([FromBody] CreateDocumentDto createDto, CancellationToken cancellationToken = default)
     {
-        if (!ModelState.IsValid)
-            return BadRequest(ModelState);
+        // Ручная валидация
+        var validationResult = await _createValidator.ValidateAsync(createDto, cancellationToken);
+        if (!validationResult.IsValid)
+        {
+            return BadRequest(validationResult.Errors);
+        }
 
         try
         {
@@ -143,8 +155,11 @@ public class DocumentsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateDocumentDto updateDto, CancellationToken cancellationToken = default)
     {
-        if (!ModelState.IsValid)
-            return BadRequest(ModelState);
+        var validationResult = await _updateValidator.ValidateAsync(updateDto, cancellationToken);
+        if (!validationResult.IsValid)
+        {
+            return BadRequest(validationResult.Errors);
+        }
 
         try
         {
@@ -253,14 +268,12 @@ public class DocumentsController : ControllerBase
         [FromBody] List<CreateDocumentDto> createDtos,
         CancellationToken cancellationToken = default)
     {
-        if (!ModelState.IsValid)
-            return BadRequest(ModelState);
-
         if (createDtos == null || createDtos.Count == 0)
             return BadRequest("Bulk request cannot be empty.");
-
         if (createDtos.Count > MaxBulkSize)
             return BadRequest($"Too many items in bulk request. Maximum allowed: {MaxBulkSize}.");
+
+        // Валидацию каждого DTO можно выполнить здесь, но для простоты пропустим (можно добавить позже)
 
         try
         {
@@ -290,12 +303,8 @@ public class DocumentsController : ControllerBase
         [FromBody] List<UpdateBulkDocumentDto> updateDtos,
         CancellationToken cancellationToken = default)
     {
-        if (!ModelState.IsValid)
-            return BadRequest(ModelState);
-
         if (updateDtos == null || updateDtos.Count == 0)
             return BadRequest("Bulk request cannot be empty.");
-
         if (updateDtos.Count > MaxBulkSize)
             return BadRequest($"Too many items in bulk request. Maximum allowed: {MaxBulkSize}.");
 
@@ -319,7 +328,7 @@ public class DocumentsController : ControllerBase
     /// <summary>
     /// Массовое удаление документов с детальным ответом
     /// </summary>
-    [HttpPost("bulk/delete")] // изменено на POST с телом, чтобы избежать длинного URL
+    [HttpPost("bulk/delete")] // используем POST с телом для избежания длинного URL
     [ProducesResponseType(typeof(BulkOperationResult<Guid>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
@@ -329,7 +338,6 @@ public class DocumentsController : ControllerBase
     {
         if (ids == null || ids.Length == 0)
             return BadRequest("IDs cannot be empty.");
-
         if (ids.Length > MaxBulkSize)
             return BadRequest($"Too many items in bulk request. Maximum allowed: {MaxBulkSize}.");
 
@@ -350,14 +358,10 @@ public class DocumentsController : ControllerBase
         }
     }
 
-    /// <summary>
-    /// Проверяет формат строки сортировки (простая валидация)
-    /// </summary>
     private static bool IsValidSortFormat(string sort)
     {
         if (string.IsNullOrWhiteSpace(sort))
             return true;
-
         var parts = sort.Split(',');
         foreach (var part in parts)
         {

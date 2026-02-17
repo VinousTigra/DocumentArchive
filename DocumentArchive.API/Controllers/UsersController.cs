@@ -2,6 +2,7 @@
 using DocumentArchive.Core.DTOs.Shared;
 using DocumentArchive.Core.DTOs.User;
 using DocumentArchive.Core.Interfaces.Services;
+using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 
 namespace DocumentArchive.API.Controllers;
@@ -12,22 +13,25 @@ namespace DocumentArchive.API.Controllers;
 public class UsersController : ControllerBase
 {
     private readonly IUserService _userService;
+    private readonly IValidator<CreateUserDto> _createValidator;
+    private readonly IValidator<UpdateUserDto> _updateValidator;
     private readonly ILogger<UsersController> _logger;
 
-    public UsersController(IUserService userService, ILogger<UsersController> logger)
+    public UsersController(
+        IUserService userService,
+        IValidator<CreateUserDto> createValidator,
+        IValidator<UpdateUserDto> updateValidator,
+        ILogger<UsersController> logger)
     {
         _userService = userService;
+        _createValidator = createValidator;
+        _updateValidator = updateValidator;
         _logger = logger;
     }
 
     /// <summary>
     /// Получает список пользователей с пагинацией и поиском
     /// </summary>
-    /// <param name="page">Номер страницы (>=1)</param>
-    /// <param name="pageSize">Размер страницы (1-100)</param>
-    /// <param name="search">Поисковый запрос (по имени и email)</param>
-    /// <param name="cancellationToken">Токен отмены</param>
-    /// <returns>Страница с пользователями</returns>
     [HttpGet]
     [ProducesResponseType(typeof(PagedResult<UserListItemDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -38,9 +42,8 @@ public class UsersController : ControllerBase
         [FromQuery] string? search = null,
         CancellationToken cancellationToken = default)
     {
-        // Валидация параметров
         if (page < 1)
-            return BadRequest("Page must be greater than or equal to 1.");
+            return BadRequest("Page must be >= 1.");
         if (pageSize < 1 || pageSize > 100)
             return BadRequest("Page size must be between 1 and 100.");
 
@@ -64,9 +67,6 @@ public class UsersController : ControllerBase
     /// <summary>
     /// Получает пользователя по ID
     /// </summary>
-    /// <param name="id">GUID пользователя</param>
-    /// <param name="cancellationToken">Токен отмены</param>
-    /// <returns>Информация о пользователе</returns>
     [HttpGet("{id}")]
     [ProducesResponseType(typeof(UserResponseDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -96,22 +96,22 @@ public class UsersController : ControllerBase
     /// <summary>
     /// Создаёт нового пользователя
     /// </summary>
-    /// <param name="createDto">Данные для создания</param>
-    /// <param name="cancellationToken">Токен отмены</param>
-    /// <returns>Созданный пользователь</returns>
     [HttpPost]
     [ProducesResponseType(typeof(UserResponseDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<UserResponseDto>> Create([FromBody] CreateUserDto createDto, CancellationToken cancellationToken = default)
     {
-        if (!ModelState.IsValid)
-            return BadRequest(ModelState);
+        var validationResult = await _createValidator.ValidateAsync(createDto, cancellationToken);
+        if (!validationResult.IsValid)
+        {
+            return BadRequest(validationResult.Errors);
+        }
 
         try
         {
-            var user = await _userService.CreateUserAsync(createDto, cancellationToken);
-            return CreatedAtAction(nameof(GetById), new { id = user.Id }, user);
+            var result = await _userService.CreateUserAsync(createDto, cancellationToken);
+            return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
         }
         catch (InvalidOperationException ex)
         {
@@ -133,10 +133,6 @@ public class UsersController : ControllerBase
     /// <summary>
     /// Обновляет пользователя
     /// </summary>
-    /// <param name="id">GUID пользователя</param>
-    /// <param name="updateDto">Данные для обновления</param>
-    /// <param name="cancellationToken">Токен отмены</param>
-    /// <returns>Нет содержимого</returns>
     [HttpPut("{id}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -144,8 +140,11 @@ public class UsersController : ControllerBase
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateUserDto updateDto, CancellationToken cancellationToken = default)
     {
-        if (!ModelState.IsValid)
-            return BadRequest(ModelState);
+        var validationResult = await _updateValidator.ValidateAsync(updateDto, cancellationToken);
+        if (!validationResult.IsValid)
+        {
+            return BadRequest(validationResult.Errors);
+        }
 
         try
         {
@@ -176,9 +175,6 @@ public class UsersController : ControllerBase
     /// <summary>
     /// Удаляет пользователя
     /// </summary>
-    /// <param name="id">GUID пользователя</param>
-    /// <param name="cancellationToken">Токен отмены</param>
-    /// <returns>Нет содержимого</returns>
     [HttpDelete("{id}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -215,15 +211,10 @@ public class UsersController : ControllerBase
     /// <summary>
     /// Получает документы пользователя с пагинацией
     /// </summary>
-    /// <param name="id">GUID пользователя</param>
-    /// <param name="page">Номер страницы (>=1)</param>
-    /// <param name="pageSize">Размер страницы (1-100)</param>
-    /// <param name="cancellationToken">Токен отмены</param>
-    /// <returns>Страница с документами</returns>
     [HttpGet("{id}/documents")]
     [ProducesResponseType(typeof(PagedResult<DocumentListItemDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<PagedResult<DocumentListItemDto>>> GetUserDocuments(
         Guid id,
@@ -232,14 +223,14 @@ public class UsersController : ControllerBase
         CancellationToken cancellationToken = default)
     {
         if (page < 1)
-            return BadRequest("Page must be greater than or equal to 1.");
+            return BadRequest("Page must be >= 1.");
         if (pageSize < 1 || pageSize > 100)
             return BadRequest("Page size must be between 1 and 100.");
 
         try
         {
-            var documents = await _userService.GetUserDocumentsAsync(id, page, pageSize, cancellationToken);
-            return Ok(documents);
+            var result = await _userService.GetUserDocumentsAsync(id, page, pageSize, cancellationToken);
+            return Ok(result);
         }
         catch (KeyNotFoundException)
         {

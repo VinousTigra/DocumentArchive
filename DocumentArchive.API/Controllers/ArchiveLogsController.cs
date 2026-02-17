@@ -1,8 +1,8 @@
-﻿
-using DocumentArchive.Core.DTOs.ArchiveLog;
+﻿using DocumentArchive.Core.DTOs.ArchiveLog;
 using DocumentArchive.Core.DTOs.Shared;
 using DocumentArchive.Core.Interfaces.Services;
 using DocumentArchive.Core.Models;
+using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 
 namespace DocumentArchive.API.Controllers;
@@ -13,26 +13,22 @@ namespace DocumentArchive.API.Controllers;
 public class ArchiveLogsController : ControllerBase
 {
     private readonly IArchiveLogService _logService;
+    private readonly IValidator<CreateArchiveLogDto> _createValidator;
     private readonly ILogger<ArchiveLogsController> _logger;
 
-    public ArchiveLogsController(IArchiveLogService logService, ILogger<ArchiveLogsController> logger)
+    public ArchiveLogsController(
+        IArchiveLogService logService,
+        IValidator<CreateArchiveLogDto> createValidator,
+        ILogger<ArchiveLogsController> logger)
     {
         _logService = logService;
+        _createValidator = createValidator;
         _logger = logger;
     }
 
     /// <summary>
     /// Получает список логов с пагинацией и фильтрацией
     /// </summary>
-    /// <param name="page">Номер страницы (по умолч. 1)</param>
-    /// <param name="pageSize">Размер страницы (по умолч. 20, макс. 100)</param>
-    /// <param name="documentId">Фильтр по ID документа</param>
-    /// <param name="userId">Фильтр по ID пользователя</param>
-    /// <param name="fromDate">Фильтр по дате (от)</param>
-    /// <param name="toDate">Фильтр по дате (до)</param>
-    /// <param name="actionType">Фильтр по типу действия</param>
-    /// <param name="isCritical">Фильтр по критичности</param>
-    /// <returns>Страница с логами</returns>
     [HttpGet]
     [ProducesResponseType(typeof(PagedResult<ArchiveLogListItemDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -48,7 +44,6 @@ public class ArchiveLogsController : ControllerBase
         [FromQuery] bool? isCritical = null,
         CancellationToken cancellationToken = default)
     {
-        // Валидация параметров
         if (page < 1)
             return BadRequest("Page must be >= 1.");
         if (pageSize < 1 || pageSize > 100)
@@ -112,8 +107,11 @@ public class ArchiveLogsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<ArchiveLogResponseDto>> Create([FromBody] CreateArchiveLogDto createDto, CancellationToken cancellationToken = default)
     {
-        if (!ModelState.IsValid)
-            return BadRequest(ModelState);
+        var validationResult = await _createValidator.ValidateAsync(createDto, cancellationToken);
+        if (!validationResult.IsValid)
+        {
+            return BadRequest(validationResult.Errors);
+        }
 
         try
         {

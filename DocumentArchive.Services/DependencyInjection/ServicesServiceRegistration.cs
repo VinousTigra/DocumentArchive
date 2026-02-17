@@ -1,6 +1,7 @@
 ﻿using DocumentArchive.Core.Interfaces.Services;
 using DocumentArchive.Services.Mapping;
 using DocumentArchive.Services.Services;
+using DocumentArchive.Services.Validators;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -21,7 +22,7 @@ public static class ServicesServiceRegistration
         services.AddScoped<IArchiveLogService, ArchiveLogService>();
 
         // Валидаторы 
-        services.AddValidatorsFromAssemblyContaining<Validators.CreateDocumentDtoValidator>();
+        services.AddValidatorsFromAssemblyContaining<CreateDocumentDtoValidator>();
         return services;
     }
 }

@@ -1,8 +1,8 @@
-﻿using AutoMapper;
-using DocumentArchive.Core.DTOs.Category;
+﻿using DocumentArchive.Core.DTOs.Category;
 using DocumentArchive.Core.DTOs.Document;
 using DocumentArchive.Core.DTOs.Shared;
 using DocumentArchive.Core.Interfaces.Services;
+using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 
 namespace DocumentArchive.API.Controllers;
@@ -13,23 +13,25 @@ namespace DocumentArchive.API.Controllers;
 public class CategoriesController : ControllerBase
 {
     private readonly ICategoryService _categoryService;
+    private readonly IValidator<CreateCategoryDto> _createValidator;
+    private readonly IValidator<UpdateCategoryDto> _updateValidator;
     private readonly ILogger<CategoriesController> _logger;
 
-    public CategoriesController(ICategoryService categoryService, ILogger<CategoriesController> logger)
+    public CategoriesController(
+        ICategoryService categoryService,
+        IValidator<CreateCategoryDto> createValidator,
+        IValidator<UpdateCategoryDto> updateValidator,
+        ILogger<CategoriesController> logger)
     {
         _categoryService = categoryService;
+        _createValidator = createValidator;
+        _updateValidator = updateValidator;
         _logger = logger;
     }
 
     /// <summary>
     /// Получает список категорий с пагинацией, поиском и сортировкой
     /// </summary>
-    /// <param name="page">Номер страницы (по умолч. 1)</param>
-    /// <param name="pageSize">Размер страницы (по умолч. 10, макс. 100)</param>
-    /// <param name="search">Поисковый запрос (по названию и описанию)</param>
-    /// <param name="sortBy">Поле для сортировки (name, createdAt)</param>
-    /// <param name="sortOrder">Направление (asc, desc)</param>
-    /// <returns>Страница с категориями</returns>
     [HttpGet]
     [ProducesResponseType(typeof(PagedResult<CategoryListItemDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -42,23 +44,20 @@ public class CategoriesController : ControllerBase
         [FromQuery] string? sortOrder = "asc",
         CancellationToken cancellationToken = default)
     {
-        // Валидация параметров
         if (page < 1)
-            return BadRequest("Page must be greater than or equal to 1.");
+            return BadRequest("Page must be >= 1.");
         if (pageSize < 1 || pageSize > 100)
             return BadRequest("Page size must be between 1 and 100.");
         if (sortOrder?.ToLower() != "asc" && sortOrder?.ToLower() != "desc")
             return BadRequest("Sort order must be 'asc' or 'desc'.");
 
-        // Проверка допустимых полей сортировки
         var allowedSortFields = new[] { "name", "createdat" };
         if (!string.IsNullOrWhiteSpace(sortBy) && !allowedSortFields.Contains(sortBy.ToLowerInvariant()))
             return BadRequest($"Invalid sort field. Allowed values: {string.Join(", ", allowedSortFields)}.");
 
         try
         {
-            var result = await _categoryService.GetCategoriesAsync(
-                page, pageSize, search, sortBy, sortOrder, cancellationToken);
+            var result = await _categoryService.GetCategoriesAsync(page, pageSize, search, sortBy, sortOrder, cancellationToken);
             return Ok(result);
         }
         catch (OperationCanceledException)
@@ -111,13 +110,16 @@ public class CategoriesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<CategoryResponseDto>> Create([FromBody] CreateCategoryDto createDto, CancellationToken cancellationToken = default)
     {
-        if (!ModelState.IsValid)
-            return BadRequest(ModelState);
+        var validationResult = await _createValidator.ValidateAsync(createDto, cancellationToken);
+        if (!validationResult.IsValid)
+        {
+            return BadRequest(validationResult.Errors);
+        }
 
         try
         {
-            var category = await _categoryService.CreateCategoryAsync(createDto, cancellationToken);
-            return CreatedAtAction(nameof(GetById), new { id = category.Id }, category);
+            var result = await _categoryService.CreateCategoryAsync(createDto, cancellationToken);
+            return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
         }
         catch (InvalidOperationException ex)
         {
@@ -146,8 +148,11 @@ public class CategoriesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateCategoryDto updateDto, CancellationToken cancellationToken = default)
     {
-        if (!ModelState.IsValid)
-            return BadRequest(ModelState);
+        var validationResult = await _updateValidator.ValidateAsync(updateDto, cancellationToken);
+        if (!validationResult.IsValid)
+        {
+            return BadRequest(validationResult.Errors);
+        }
 
         try
         {
@@ -214,10 +219,6 @@ public class CategoriesController : ControllerBase
     /// <summary>
     /// Получает документы в категории с пагинацией
     /// </summary>
-    /// <param name="id">ID категории</param>
-    /// <param name="page">Номер страницы (по умолч. 1)</param>
-    /// <param name="pageSize">Размер страницы (по умолч. 10, макс. 100)</param>
-    /// <returns>Страница с документами</returns>
     [HttpGet("{id}/documents")]
     [ProducesResponseType(typeof(PagedResult<DocumentListItemDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]

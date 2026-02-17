@@ -14,47 +14,62 @@ public class CategoryRepository : FileStorageRepository<Category>, ICategoryRepo
     {
     }
 
-    // 🔸 Для DI
+    // Для DI
     public CategoryRepository(IOptions<StorageOptions> options) 
         : base("categories.json", c => c.Id, options)
     {
     }
 
-    public Task<PagedResult<Category>> GetPagedAsync(int page, int pageSize, string? search, string? sortBy, string? sortOrder)
-    {
-        throw new NotImplementedException();
-    }
-
-    public async Task<Category?> FindByNameAsync(string name)
-    {
-        return (await FindAsync(c => c.Name.Equals(name, StringComparison.OrdinalIgnoreCase))).FirstOrDefault();
-    }
-
-    public Task<PagedResult<Category>> GetPagedAsync(int page, int pageSize, string? search, string? sortBy, string? sortOrder,
+    public async Task<PagedResult<Category>> GetPagedAsync(
+        int page,
+        int pageSize,
+        string? search,
+        string? sortBy,
+        string? sortOrder,
         CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        var categories = await GetAllAsync(cancellationToken);
+
+        // Фильтрация по поиску
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var lowerSearch = search.ToLowerInvariant();
+            categories = categories.Where(c =>
+                c.Name.ToLowerInvariant().Contains(lowerSearch) ||
+                (c.Description?.ToLowerInvariant().Contains(lowerSearch) ?? false));
+        }
+
+        // Сортировка
+        categories = (sortBy?.ToLowerInvariant()) switch
+        {
+            "name" => sortOrder == "asc"
+                ? categories.OrderBy(c => c.Name)
+                : categories.OrderByDescending(c => c.Name),
+            "createdat" => sortOrder == "asc"
+                ? categories.OrderBy(c => c.CreatedAt)
+                : categories.OrderByDescending(c => c.CreatedAt),
+            _ => categories.OrderBy(c => c.Name)
+        };
+
+        // Пагинация
+        var totalCount = categories.Count();
+        var items = categories
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToList();
+
+        return new PagedResult<Category>
+        {
+            Items = items,
+            PageNumber = page,
+            PageSize = pageSize,
+            TotalCount = totalCount
+        };
     }
 
-
-
-    public Task<Category?> FindByNameAsync(string name, CancellationToken cancellationToken = default)
+    public async Task<Category?> FindByNameAsync(string name, CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
-    }
-
-    public new Task AddAsync(Category entity, CancellationToken cancellationToken = default)
-    {
-        throw new NotImplementedException();
-    }
-
-    public new Task UpdateAsync(Category entity, CancellationToken cancellationToken = default)
-    {
-        throw new NotImplementedException();
-    }
-
-    public new Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
-    {
-        throw new NotImplementedException();
+        return (await FindAsync(c => c.Name.Equals(name, StringComparison.OrdinalIgnoreCase), cancellationToken))
+            .FirstOrDefault();
     }
 }

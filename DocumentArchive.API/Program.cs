@@ -2,7 +2,6 @@
 using DocumentArchive.API.Middleware;
 using DocumentArchive.Infrastructure.DependencyInjection;
 using DocumentArchive.Services.DependencyInjection;
-using FluentValidation.AspNetCore; 
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -13,10 +12,6 @@ builder.Services.AddControllers()
     {
         options.JsonSerializerOptions.WriteIndented = true;
     });
-
-// регистрация FluentValidation
-builder.Services.AddFluentValidationAutoValidation();
-builder.Services.AddFluentValidationClientsideAdapters();
 
 // Передаём конфигурацию в метод расширения Infrastructure 
 builder.Services.AddInfrastructure(builder.Configuration);

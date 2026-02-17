@@ -20,34 +20,51 @@ public class UserRepository : FileStorageRepository<User>, IUserRepository
     {
     }
 
-    public Task<PagedResult<User>> GetPagedAsync(int page, int pageSize, string? search)
+    public async Task<PagedResult<User>> GetPagedAsync(
+        int page,
+        int pageSize,
+        string? search,
+        CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        var users = await GetAllAsync(cancellationToken);
+
+        // Поиск по Username или Email
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var lowerSearch = search.ToLowerInvariant();
+            users = users.Where(u =>
+                u.Username.ToLowerInvariant().Contains(lowerSearch) ||
+                u.Email.ToLowerInvariant().Contains(lowerSearch));
+        }
+
+        // Сортировка по Username
+        users = users.OrderBy(u => u.Username);
+
+        // Пагинация
+        var totalCount = users.Count();
+        var items = users
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToList();
+
+        return new PagedResult<User>
+        {
+            Items = items,
+            PageNumber = page,
+            PageSize = pageSize,
+            TotalCount = totalCount
+        };
     }
 
-    public async Task<User?> FindByEmailAsync(string email)
+    public async Task<User?> FindByEmailAsync(string email, CancellationToken cancellationToken = default)
     {
-        return (await FindAsync(u => u.Email.Equals(email, StringComparison.OrdinalIgnoreCase))).FirstOrDefault();
+        return (await FindAsync(u => u.Email.Equals(email, StringComparison.OrdinalIgnoreCase), cancellationToken))
+            .FirstOrDefault();
     }
 
-    public async Task<User?> FindByUsernameAsync(string username)
+    public async Task<User?> FindByUsernameAsync(string username, CancellationToken cancellationToken = default)
     {
-        return (await FindAsync(u => u.Username.Equals(username, StringComparison.OrdinalIgnoreCase))).FirstOrDefault();
+        return (await FindAsync(u => u.Username.Equals(username, StringComparison.OrdinalIgnoreCase), cancellationToken))
+            .FirstOrDefault();
     }
-
-    public Task<PagedResult<User>> GetPagedAsync(int page, int pageSize, string? search, CancellationToken cancellationToken = default)
-    {
-        throw new NotImplementedException();
-    }
-
-    public Task<User?> FindByEmailAsync(string email, CancellationToken cancellationToken = default)
-    {
-        throw new NotImplementedException();
-    }
-
-    public Task<User?> FindByUsernameAsync(string username, CancellationToken cancellationToken = default)
-    {
-        throw new NotImplementedException();
-    }
-    
 }
