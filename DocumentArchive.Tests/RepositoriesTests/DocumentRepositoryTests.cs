@@ -1,3 +1,4 @@
+#nullable disable
 using DocumentArchive.Core.Models;
 using DocumentArchive.Infrastructure.Repositories;
 using FluentAssertions;
@@ -6,14 +7,14 @@ namespace DocumentArchive.Tests.RepositoriesTests;
 
 public class DocumentRepositoryTests : IDisposable
 {
-    private readonly string _testDirectory;
     private readonly DocumentRepository _repository;
+    private readonly string _testDirectory;
 
     public DocumentRepositoryTests()
     {
         _testDirectory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
         Directory.CreateDirectory(_testDirectory);
-        _repository = new DocumentRepository(_testDirectory); // передаём временную папку
+        _repository = new DocumentRepository(_testDirectory);
     }
 
     public void Dispose()
@@ -105,40 +106,6 @@ public class DocumentRepositoryTests : IDisposable
     }
 
     [Fact]
-    public async Task SearchAsync_ShouldFindByTitle()
-    {
-        // Arrange
-        var doc1 = new Document { Id = Guid.NewGuid(), Title = "Alpha Report", FileName = "a.pdf" };
-        var doc2 = new Document { Id = Guid.NewGuid(), Title = "Beta Summary", FileName = "b.pdf" };
-        await _repository.AddAsync(doc1);
-        await _repository.AddAsync(doc2);
-
-        // Act
-        var result = await _repository.SearchAsync("alpha");
-
-        // Assert
-        result.Should().ContainSingle();
-        result.First().Title.Should().Be("Alpha Report");
-    }
-
-    [Fact]
-    public async Task SearchAsync_ShouldFindByDescription()
-    {
-        // Arrange
-        var doc1 = new Document { Id = Guid.NewGuid(), Title = "Doc1", Description = "Important report", FileName = "a.pdf" };
-        var doc2 = new Document { Id = Guid.NewGuid(), Title = "Doc2", FileName = "b.pdf" };
-        await _repository.AddAsync(doc1);
-        await _repository.AddAsync(doc2);
-
-        // Act
-        var result = await _repository.SearchAsync("important");
-
-        // Assert
-        result.Should().ContainSingle();
-        result.First().Id.Should().Be(doc1.Id);
-    }
-
-    [Fact]
     public async Task GetByCategoryAsync_ShouldFilterByCategory()
     {
         // Arrange
@@ -172,5 +139,67 @@ public class DocumentRepositoryTests : IDisposable
         // Assert
         result.Should().ContainSingle();
         result.First().Id.Should().Be(doc1.Id);
+    }
+
+    [Fact]
+    public async Task GetPagedAsync_ShouldReturnPagedResult_WithFiltering()
+    {
+        // Arrange
+        var catId = Guid.NewGuid();
+        var docs = new List<Document>();
+        for (int i = 0; i < 15; i++)
+        {
+            docs.Add(new Document
+            {
+                Id = Guid.NewGuid(),
+                Title = $"Doc{i}",
+                FileName = $"{i}.pdf",
+                UploadDate = DateTime.UtcNow.AddDays(-i),
+                CategoryId = i % 2 == 0 ? catId : null
+            });
+        }
+        foreach (var doc in docs)
+            await _repository.AddAsync(doc);
+
+        // Act
+        var result = await _repository.GetPagedAsync(
+            page: 2,
+            pageSize: 5,
+            search: null,
+            categoryIds: new[] { catId },
+            userId: null,
+            fromDate: null,
+            toDate: null,
+            sort: "uploaddate:desc");
+
+        // Assert
+        result.PageNumber.Should().Be(2);
+        result.PageSize.Should().Be(5);
+        var expectedTotal = docs.Count(d => d.CategoryId == catId); // 8
+        result.TotalCount.Should().Be(expectedTotal);
+        var expectedItemsCount = Math.Max(0, expectedTotal - 5); // 3
+        result.Items.Should().HaveCount(expectedItemsCount);
+    }
+
+    [Fact]
+    public async Task GetPagedAsync_ShouldFilterBySearch()
+    {
+        // Arrange
+        var docs = new List<Document>
+        {
+            new() { Id = Guid.NewGuid(), Title = "Alpha Report", Description = "Important", FileName = "a.pdf" },
+            new() { Id = Guid.NewGuid(), Title = "Beta Summary", Description = "Less important", FileName = "b.pdf" }
+        };
+        foreach (var doc in docs)
+            await _repository.AddAsync(doc);
+
+        // Act
+        var result = await _repository.GetPagedAsync(
+            1, 10, "alpha", null, null,
+            null, null, null);
+
+        // Assert
+        result.TotalCount.Should().Be(1);
+        result.Items.Single().Title.Should().Be("Alpha Report");
     }
 }

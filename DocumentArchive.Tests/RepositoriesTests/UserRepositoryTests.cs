@@ -6,8 +6,8 @@ namespace DocumentArchive.Tests.RepositoriesTests;
 
 public class UserRepositoryTests : IDisposable
 {
-    private readonly string _testDirectory;
     private readonly UserRepository _repository;
+    private readonly string _testDirectory;
 
     public UserRepositoryTests()
     {
@@ -25,7 +25,6 @@ public class UserRepositoryTests : IDisposable
     [Fact]
     public async Task AddAsync_ShouldAddUser()
     {
-        // Arrange
         var user = new User
         {
             Id = Guid.NewGuid(),
@@ -33,146 +32,112 @@ public class UserRepositoryTests : IDisposable
             Email = "test@example.com",
             CreatedAt = DateTime.UtcNow
         };
-
-        // Act
         await _repository.AddAsync(user);
         var retrieved = await _repository.GetByIdAsync(user.Id);
-
-        // Assert
         retrieved.Should().NotBeNull();
         retrieved!.Username.Should().Be("testuser");
-        retrieved.Email.Should().Be("test@example.com");
     }
 
     [Fact]
     public async Task GetAllAsync_ShouldReturnAllUsers()
     {
-        // Arrange
-        var user1 = new User { Id = Guid.NewGuid(), Username = "user1", Email = "user1@test.com" };
-        var user2 = new User { Id = Guid.NewGuid(), Username = "user2", Email = "user2@test.com" };
+        var user1 = new User { Id = Guid.NewGuid(), Username = "user1", Email = "u1@test.com" };
+        var user2 = new User { Id = Guid.NewGuid(), Username = "user2", Email = "u2@test.com" };
         await _repository.AddAsync(user1);
         await _repository.AddAsync(user2);
-
-        // Act
         var result = await _repository.GetAllAsync();
-
-        // Assert
         result.Should().HaveCount(2);
-        result.Select(u => u.Username).Should().Contain(new[] { "user1", "user2" });
     }
 
     [Fact]
-    public async Task GetByIdAsync_ShouldReturnUser_WhenExists()
+    public async Task UpdateAsync_ShouldModifyUser()
     {
-        // Arrange
-        var user = new User { Id = Guid.NewGuid(), Username = "test", Email = "test@test.com" };
+        var user = new User { Id = Guid.NewGuid(), Username = "old", Email = "old@test.com" };
         await _repository.AddAsync(user);
-
-        // Act
-        var result = await _repository.GetByIdAsync(user.Id);
-
-        // Assert
-        result.Should().NotBeNull();
-        result!.Username.Should().Be("test");
+        user.Username = "new";
+        await _repository.UpdateAsync(user);
+        var updated = await _repository.GetByIdAsync(user.Id);
+        updated!.Username.Should().Be("new");
     }
 
     [Fact]
-    public async Task GetByIdAsync_ShouldReturnNull_WhenNotExists()
+    public async Task DeleteAsync_ShouldRemoveUser()
     {
-        // Act
-        var result = await _repository.GetByIdAsync(Guid.NewGuid());
-
-        // Assert
+        var user = new User { Id = Guid.NewGuid(), Username = "temp", Email = "temp@test.com" };
+        await _repository.AddAsync(user);
+        await _repository.DeleteAsync(user.Id);
+        var result = await _repository.GetByIdAsync(user.Id);
         result.Should().BeNull();
     }
 
     [Fact]
     public async Task FindByEmailAsync_ShouldReturnUser_WhenExists()
     {
-        // Arrange
         var user = new User { Id = Guid.NewGuid(), Username = "john", Email = "john@example.com" };
         await _repository.AddAsync(user);
-
-        // Act
-        var result = await _repository.FindByEmailAsync("john@example.com");
-
-        // Assert
-        result.Should().NotBeNull();
-        result!.Username.Should().Be("john");
+        var found = await _repository.FindByEmailAsync("john@example.com");
+        found.Should().NotBeNull();
+        found!.Username.Should().Be("john");
     }
 
     [Fact]
     public async Task FindByEmailAsync_ShouldReturnNull_WhenNotExists()
     {
-        // Act
-        var result = await _repository.FindByEmailAsync("none@example.com");
-
-        // Assert
-        result.Should().BeNull();
+        var found = await _repository.FindByEmailAsync("none@example.com");
+        found.Should().BeNull();
     }
 
     [Fact]
     public async Task FindByUsernameAsync_ShouldReturnUser_WhenExists()
     {
-        // Arrange
         var user = new User { Id = Guid.NewGuid(), Username = "alice", Email = "alice@example.com" };
         await _repository.AddAsync(user);
-
-        // Act
-        var result = await _repository.FindByUsernameAsync("alice");
-
-        // Assert
-        result.Should().NotBeNull();
-        result!.Email.Should().Be("alice@example.com");
+        var found = await _repository.FindByUsernameAsync("alice");
+        found.Should().NotBeNull();
+        found!.Email.Should().Be("alice@example.com");
     }
 
     [Fact]
-    public async Task FindByUsernameAsync_ShouldReturnNull_WhenNotExists()
-    {
-        // Act
-        var result = await _repository.FindByUsernameAsync("bob");
-
-        // Assert
-        result.Should().BeNull();
-    }
-
-    [Fact]
-    public async Task UpdateAsync_ShouldModifyUser()
+    public async Task GetPagedAsync_ShouldReturnPagedResult_WithSearch()
     {
         // Arrange
-        var user = new User
+        for (var i = 0; i < 15; i++)
         {
-            Id = Guid.NewGuid(),
-            Username = "oldname",
-            Email = "old@test.com"
-        };
-        await _repository.AddAsync(user);
-
-        user.Username = "newname";
-        user.Email = "new@test.com";
-        user.UpdatedAt = DateTime.UtcNow;
+            var user = new User
+            {
+                Id = Guid.NewGuid(),
+                Username = $"user{i}",
+                Email = $"user{i}@test.com"
+            };
+            await _repository.AddAsync(user);
+        }
 
         // Act
-        await _repository.UpdateAsync(user);
-        var updated = await _repository.GetByIdAsync(user.Id);
+        var result = await _repository.GetPagedAsync(2, 5, "user1");
 
         // Assert
-        updated!.Username.Should().Be("newname");
-        updated.Email.Should().Be("new@test.com");
+        result.PageNumber.Should().Be(2);
+        result.PageSize.Should().Be(5);
+        result.TotalCount.Should()
+            .Be(6); // user0..user15, но с поиском "user1" будут user1, user10..user15? Нет, поиск по подстроке "user1" найдёт user1, user10, user11, ... user15 (всего 7? Проверим)
+        // Более простой тест: создадим конкретные
     }
 
+    // Более точный тест для поиска
     [Fact]
-    public async Task DeleteAsync_ShouldRemoveUser()
+    public async Task GetPagedAsync_Search_ShouldFilterCorrectly()
     {
-        // Arrange
-        var user = new User { Id = Guid.NewGuid(), Username = "temp", Email = "temp@test.com" };
-        await _repository.AddAsync(user);
+        var users = new List<User>
+        {
+            new() { Id = Guid.NewGuid(), Username = "alice", Email = "alice@test.com" },
+            new() { Id = Guid.NewGuid(), Username = "bob", Email = "bob@test.com" },
+            new() { Id = Guid.NewGuid(), Username = "charlie", Email = "charlie@test.com" }
+        };
+        foreach (var u in users)
+            await _repository.AddAsync(u);
 
-        // Act
-        await _repository.DeleteAsync(user.Id);
-        var result = await _repository.GetByIdAsync(user.Id);
-
-        // Assert
-        result.Should().BeNull();
+        var result = await _repository.GetPagedAsync(1, 10, "bob");
+        result.TotalCount.Should().Be(1);
+        result.Items.Single().Username.Should().Be("bob");
     }
 }

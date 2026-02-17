@@ -1,0 +1,26 @@
+[
+  {
+    "Id": "764cf5a7-8db8-4724-a808-e3c99725d9eb",
+    "Title": "kniga",
+    "Description": null,
+    "FileName": "\u043A\u043D\u0438\u0433\u0430",
+    "UploadDate": "2026-02-17T18:56:29.0028143Z",
+    "UpdatedAt": null,
+    "UserId": null,
+    "User": null,
+    "CategoryId": null,
+    "Category": null
+  },
+  {
+    "Id": "63521e89-b00e-4888-b3c6-2a0c05acfde9",
+    "Title": "test",
+    "Description": null,
+    "FileName": "test",
+    "UploadDate": "2026-02-17T19:00:13.3802694Z",
+    "UpdatedAt": null,
+    "UserId": null,
+    "User": null,
+    "CategoryId": null,
+    "Category": null
+  }
+]

@@ -12,9 +12,9 @@ namespace DocumentArchive.API.Controllers;
 [Produces("application/json")]
 public class ArchiveLogsController : ControllerBase
 {
-    private readonly IArchiveLogService _logService;
     private readonly IValidator<CreateArchiveLogDto> _createValidator;
     private readonly ILogger<ArchiveLogsController> _logger;
+    private readonly IArchiveLogService _logService;
 
     public ArchiveLogsController(
         IArchiveLogService logService,
@@ -27,7 +27,7 @@ public class ArchiveLogsController : ControllerBase
     }
 
     /// <summary>
-    /// Получает список логов с пагинацией и фильтрацией
+    ///     Получает список логов с пагинацией и фильтрацией
     /// </summary>
     [HttpGet]
     [ProducesResponseType(typeof(PagedResult<ArchiveLogListItemDto>), StatusCodes.Status200OK)]
@@ -65,18 +65,20 @@ public class ArchiveLogsController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting logs");
-            return StatusCode(500, new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
+            return StatusCode(500,
+                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
         }
     }
 
     /// <summary>
-    /// Получает запись лога по ID
+    ///     Получает запись лога по ID
     /// </summary>
     [HttpGet("{id}")]
     [ProducesResponseType(typeof(ArchiveLogResponseDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<ArchiveLogResponseDto>> GetById(Guid id, CancellationToken cancellationToken = default)
+    public async Task<ActionResult<ArchiveLogResponseDto>> GetById(Guid id,
+        CancellationToken cancellationToken = default)
     {
         try
         {
@@ -94,24 +96,23 @@ public class ArchiveLogsController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting log by ID {LogId}", id);
-            return StatusCode(500, new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
+            return StatusCode(500,
+                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
         }
     }
 
     /// <summary>
-    /// Создаёт запись в логе (вручную, для тестирования)
+    ///     Создаёт запись в логе (вручную, для тестирования)
     /// </summary>
     [HttpPost]
     [ProducesResponseType(typeof(ArchiveLogResponseDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<ArchiveLogResponseDto>> Create([FromBody] CreateArchiveLogDto createDto, CancellationToken cancellationToken = default)
+    public async Task<ActionResult<ArchiveLogResponseDto>> Create([FromBody] CreateArchiveLogDto createDto,
+        CancellationToken cancellationToken = default)
     {
         var validationResult = await _createValidator.ValidateAsync(createDto, cancellationToken);
-        if (!validationResult.IsValid)
-        {
-            return BadRequest(validationResult.Errors);
-        }
+        if (!validationResult.IsValid) return BadRequest(validationResult.Errors);
 
         try
         {
@@ -131,12 +132,13 @@ public class ArchiveLogsController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error creating log");
-            return StatusCode(500, new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
+            return StatusCode(500,
+                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
         }
     }
 
     /// <summary>
-    /// Удаляет запись лога
+    ///     Удаляет запись лога
     /// </summary>
     [HttpDelete("{id}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
@@ -161,7 +163,8 @@ public class ArchiveLogsController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error deleting log {LogId}", id);
-            return StatusCode(500, new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
+            return StatusCode(500,
+                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
         }
     }
 }
