@@ -1,0 +1,169 @@
+﻿
+using DocumentArchive.Core.DTOs.ArchiveLog;
+using DocumentArchive.Core.DTOs.Shared;
+using DocumentArchive.Core.Interfaces.Services;
+using DocumentArchive.Core.Models;
+using Microsoft.AspNetCore.Mvc;
+
+namespace DocumentArchive.API.Controllers;
+
+[ApiController]
+[Route("api/v1/[controller]")]
+[Produces("application/json")]
+public class ArchiveLogsController : ControllerBase
+{
+    private readonly IArchiveLogService _logService;
+    private readonly ILogger<ArchiveLogsController> _logger;
+
+    public ArchiveLogsController(IArchiveLogService logService, ILogger<ArchiveLogsController> logger)
+    {
+        _logService = logService;
+        _logger = logger;
+    }
+
+    /// <summary>
+    /// Получает список логов с пагинацией и фильтрацией
+    /// </summary>
+    /// <param name="page">Номер страницы (по умолч. 1)</param>
+    /// <param name="pageSize">Размер страницы (по умолч. 20, макс. 100)</param>
+    /// <param name="documentId">Фильтр по ID документа</param>
+    /// <param name="userId">Фильтр по ID пользователя</param>
+    /// <param name="fromDate">Фильтр по дате (от)</param>
+    /// <param name="toDate">Фильтр по дате (до)</param>
+    /// <param name="actionType">Фильтр по типу действия</param>
+    /// <param name="isCritical">Фильтр по критичности</param>
+    /// <returns>Страница с логами</returns>
+    [HttpGet]
+    [ProducesResponseType(typeof(PagedResult<ArchiveLogListItemDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<PagedResult<ArchiveLogListItemDto>>> GetAll(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        [FromQuery] Guid? documentId = null,
+        [FromQuery] Guid? userId = null,
+        [FromQuery] DateTime? fromDate = null,
+        [FromQuery] DateTime? toDate = null,
+        [FromQuery] ActionType? actionType = null,
+        [FromQuery] bool? isCritical = null,
+        CancellationToken cancellationToken = default)
+    {
+        // Валидация параметров
+        if (page < 1)
+            return BadRequest("Page must be >= 1.");
+        if (pageSize < 1 || pageSize > 100)
+            return BadRequest("Page size must be between 1 and 100.");
+        if (fromDate.HasValue && toDate.HasValue && fromDate > toDate)
+            return BadRequest("fromDate cannot be later than toDate.");
+
+        try
+        {
+            var result = await _logService.GetLogsAsync(
+                page, pageSize, documentId, userId, fromDate, toDate, actionType, isCritical, cancellationToken);
+            return Ok(result);
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("Request cancelled by client");
+            return StatusCode(499, "Request cancelled");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting logs");
+            return StatusCode(500, new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
+        }
+    }
+
+    /// <summary>
+    /// Получает запись лога по ID
+    /// </summary>
+    [HttpGet("{id}")]
+    [ProducesResponseType(typeof(ArchiveLogResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<ArchiveLogResponseDto>> GetById(Guid id, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var log = await _logService.GetLogByIdAsync(id, cancellationToken);
+            if (log == null)
+                return NotFound();
+
+            return Ok(log);
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("Request cancelled by client");
+            return StatusCode(499, "Request cancelled");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting log by ID {LogId}", id);
+            return StatusCode(500, new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
+        }
+    }
+
+    /// <summary>
+    /// Создаёт запись в логе (вручную, для тестирования)
+    /// </summary>
+    [HttpPost]
+    [ProducesResponseType(typeof(ArchiveLogResponseDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<ArchiveLogResponseDto>> Create([FromBody] CreateArchiveLogDto createDto, CancellationToken cancellationToken = default)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
+
+        try
+        {
+            var log = await _logService.CreateLogAsync(createDto, cancellationToken);
+            return CreatedAtAction(nameof(GetById), new { id = log.Id }, log);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Business rule violation in create log");
+            return BadRequest("Operation cannot be completed due to business rule violation.");
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("Request cancelled by client");
+            return StatusCode(499, "Request cancelled");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating log");
+            return StatusCode(500, new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
+        }
+    }
+
+    /// <summary>
+    /// Удаляет запись лога
+    /// </summary>
+    [HttpDelete("{id}")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await _logService.DeleteLogAsync(id, cancellationToken);
+            return NoContent();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("Request cancelled by client");
+            return StatusCode(499, "Request cancelled");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting log {LogId}", id);
+            return StatusCode(500, new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
+        }
+    }
+}
