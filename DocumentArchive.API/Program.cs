@@ -9,7 +9,6 @@ using Scalar.AspNetCore;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers()
-    .AddFluentValidation()
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.WriteIndented = true;

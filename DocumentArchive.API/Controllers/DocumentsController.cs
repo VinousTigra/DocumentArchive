@@ -3,8 +3,7 @@ using DocumentArchive.Core.DTOs.ArchiveLog;
 using DocumentArchive.Core.DTOs.Document;
 using DocumentArchive.Core.DTOs.Shared;
 using DocumentArchive.Core.Models;
-using DocumentArchive.Core.Interfaces; 
-using DocumentArchive.Infrastructure.Repositories;
+using DocumentArchive.Core.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 
 namespace DocumentArchive.API.Controllers;
@@ -12,29 +11,17 @@ namespace DocumentArchive.API.Controllers;
 [ApiController]
 [Route("api/v1/[controller]")]
 [Produces("application/json")]
-public class DocumentsController : ControllerBase
+public class DocumentsController(
+    IDocumentRepository documentRepo,
+    ICategoryRepository categoryRepo,
+    IUserRepository userRepo,
+    IArchiveLogRepository logRepo,
+    IMapper mapper)
+    : ControllerBase
 {
     // Заменяем конкретные типы на интерфейсы
-    private readonly IDocumentRepository _documentRepo;
-    private readonly ICategoryRepository _categoryRepo;
-    private readonly IUserRepository _userRepo;
-    private readonly IArchiveLogRepository _logRepo;
-    private readonly IMapper _mapper;
 
     // В конструкторе принимаем интерфейсы
-    public DocumentsController(
-        IDocumentRepository documentRepo,
-        ICategoryRepository categoryRepo,
-        IUserRepository userRepo,
-        IArchiveLogRepository logRepo,
-        IMapper mapper)
-    {
-        _documentRepo = documentRepo;
-        _categoryRepo = categoryRepo;
-        _userRepo = userRepo;
-        _logRepo = logRepo;
-        _mapper = mapper;
-    }
 
     /// <summary>
     /// Получает список документов с пагинацией, фильтрацией, поиском и множественной сортировкой
@@ -61,7 +48,7 @@ public class DocumentsController : ControllerBase
         [FromQuery] DateTime? toDate = null,
         [FromQuery] string? sort = null)
     {
-        var documents = await _documentRepo.GetAllAsync();
+        var documents = await documentRepo.GetAllAsync();
 
         // ---- Фильтрация ----
         if (!string.IsNullOrWhiteSpace(search))
@@ -69,7 +56,7 @@ public class DocumentsController : ControllerBase
             search = search.ToLowerInvariant();
             documents = documents.Where(d =>
                 d.Title.ToLowerInvariant().Contains(search) ||
-                (d.Description?.ToLowerInvariant().Contains(search) ?? false));
+                (d.Description?.ToLowerInvariant().Contains(search, StringComparison.InvariantCultureIgnoreCase) ?? false));
         }
 
         if (!string.IsNullOrWhiteSpace(categoryIds))
@@ -91,6 +78,8 @@ public class DocumentsController : ControllerBase
             documents = documents.Where(d => d.UploadDate <= toDate.Value);
 
         // ---- Множественная сортировка ----
+        var enumerable1 = documents as Document[] ?? documents.ToArray();
+        var enumerable = documents as Document[] ?? enumerable1.ToArray();
         if (!string.IsNullOrWhiteSpace(sort))
         {
             var sortFields = sort.Split(',');
@@ -105,8 +94,8 @@ public class DocumentsController : ControllerBase
                 if (ordered == null)
                 {
                     ordered = direction == "asc"
-                        ? documents.OrderBy(GetSortProperty(fieldName))
-                        : documents.OrderByDescending(GetSortProperty(fieldName));
+                        ? enumerable.OrderBy(GetSortProperty(fieldName))
+                        : enumerable.OrderByDescending(GetSortProperty(fieldName));
                 }
                 else
                 {
@@ -117,21 +106,22 @@ public class DocumentsController : ControllerBase
             }
 
             if (ordered != null)
-                documents = ordered;
+            {
+            }
         }
         else
         {
-            documents = documents.OrderByDescending(d => d.UploadDate);
+            documents = enumerable1.OrderByDescending(d => d.UploadDate);
         }
 
         // ---- Пагинация ----
-        var totalCount = documents.Count();
-        var items = documents
+        var totalCount = enumerable.Count();
+        var items = enumerable
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToList();
 
-        var dtos = _mapper.Map<List<DocumentListItemDto>>(items);
+        var dtos = mapper.Map<List<DocumentListItemDto>>(items);
         var result = new PagedResult<DocumentListItemDto>
         {
             Items = dtos,
@@ -159,11 +149,11 @@ public class DocumentsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<DocumentResponseDto>> GetById(Guid id)
     {
-        var document = await _documentRepo.GetByIdAsync(id);
+        var document = await documentRepo.GetByIdAsync(id);
         if (document == null)
             return NotFound();
 
-        var dto = _mapper.Map<DocumentResponseDto>(document);
+        var dto = mapper.Map<DocumentResponseDto>(document);
         return Ok(dto);
     }
 
@@ -178,7 +168,7 @@ public class DocumentsController : ControllerBase
         // Проверка существования категории
         if (createDto.CategoryId.HasValue)
         {
-            var category = await _categoryRepo.GetByIdAsync(createDto.CategoryId.Value);
+            var category = await categoryRepo.GetByIdAsync(createDto.CategoryId.Value);
             if (category == null)
                 return BadRequest($"Category with id {createDto.CategoryId} not found");
         }
@@ -186,16 +176,16 @@ public class DocumentsController : ControllerBase
         // Проверка существования пользователя
         if (createDto.UserId.HasValue)
         {
-            var user = await _userRepo.GetByIdAsync(createDto.UserId.Value);
+            var user = await userRepo.GetByIdAsync(createDto.UserId.Value);
             if (user == null)
                 return BadRequest($"User with id {createDto.UserId} not found");
         }
 
-        var document = _mapper.Map<Document>(createDto);
+        var document = mapper.Map<Document>(createDto);
         document.Id = Guid.NewGuid();
         document.UploadDate = DateTime.UtcNow;
 
-        await _documentRepo.AddAsync(document);
+        await documentRepo.AddAsync(document);
 
         // Создаём запись в логе
         if (createDto.UserId.HasValue)
@@ -210,10 +200,10 @@ public class DocumentsController : ControllerBase
                 UserId = createDto.UserId.Value,
                 DocumentId = document.Id
             };
-            await _logRepo.AddAsync(log);
+            await logRepo.AddAsync(log);
         }
 
-        var dto = _mapper.Map<DocumentResponseDto>(document);
+        var dto = mapper.Map<DocumentResponseDto>(document);
         return CreatedAtAction(nameof(GetById), new { id = document.Id }, dto);
     }
 
@@ -226,21 +216,21 @@ public class DocumentsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateDocumentDto updateDto)
     {
-        var existing = await _documentRepo.GetByIdAsync(id);
+        var existing = await documentRepo.GetByIdAsync(id);
         if (existing == null)
             return NotFound();
 
         if (updateDto.CategoryId.HasValue)
         {
-            var category = await _categoryRepo.GetByIdAsync(updateDto.CategoryId.Value);
+            var category = await categoryRepo.GetByIdAsync(updateDto.CategoryId.Value);
             if (category == null)
                 return BadRequest($"Category with id {updateDto.CategoryId} not found");
         }
 
-        _mapper.Map(updateDto, existing);
+        mapper.Map(updateDto, existing);
         existing.UpdatedAt = DateTime.UtcNow;
 
-        await _documentRepo.UpdateAsync(existing);
+        await documentRepo.UpdateAsync(existing);
         return NoContent();
     }
 
@@ -252,11 +242,11 @@ public class DocumentsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(Guid id)
     {
-        var existing = await _documentRepo.GetByIdAsync(id);
+        var existing = await documentRepo.GetByIdAsync(id);
         if (existing == null)
             return NotFound();
 
-        await _documentRepo.DeleteAsync(id);
+        await documentRepo.DeleteAsync(id);
         return NoContent();
     }
 
@@ -273,10 +263,10 @@ public class DocumentsController : ControllerBase
         {
             try
             {
-                var document = _mapper.Map<Document>(dto);
+                var document = mapper.Map<Document>(dto);
                 document.Id = Guid.NewGuid();
                 document.UploadDate = DateTime.UtcNow;
-                await _documentRepo.AddAsync(document);
+                await documentRepo.AddAsync(document);
                 results.Add(new { id = document.Id, success = true });
             }
             catch (Exception ex)
@@ -298,7 +288,11 @@ public class DocumentsController : ControllerBase
         var guidList = ids.Split(',')
             .Select(id => Guid.TryParse(id.Trim(), out var g) ? g : (Guid?)null)
             .Where(g => g.HasValue)
-            .Select(g => g.Value)
+            .Select(g =>
+            {
+                if (g != null) return g.Value;
+                return Guid.Empty;
+            })
             .ToList();
 
         var results = new List<object>();
@@ -307,7 +301,7 @@ public class DocumentsController : ControllerBase
         {
             try
             {
-                await _documentRepo.DeleteAsync(id);
+                await documentRepo.DeleteAsync(id);
                 results.Add(new { id, success = true });
             }
             catch (Exception ex)
@@ -332,16 +326,16 @@ public class DocumentsController : ControllerBase
         {
             try
             {
-                var existing = await _documentRepo.GetByIdAsync(dto.Id);
+                var existing = await documentRepo.GetByIdAsync(dto.Id);
                 if (existing == null)
                 {
                     results.Add(new { id = dto.Id, success = false, error = "Document not found" });
                     continue;
                 }
 
-                _mapper.Map(dto, existing);
+                mapper.Map(dto, existing);
                 existing.UpdatedAt = DateTime.UtcNow;
-                await _documentRepo.UpdateAsync(existing);
+                await documentRepo.UpdateAsync(existing);
                 results.Add(new { id = dto.Id, success = true });
             }
             catch (Exception ex)
@@ -361,12 +355,12 @@ public class DocumentsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<IEnumerable<ArchiveLogListItemDto>>> GetDocumentLogs(Guid id)
     {
-        var document = await _documentRepo.GetByIdAsync(id);
+        var document = await documentRepo.GetByIdAsync(id);
         if (document == null)
             return NotFound();
 
-        var logs = await _logRepo.GetByDocumentIdAsync(id);
-        var dtos = _mapper.Map<IEnumerable<ArchiveLogListItemDto>>(logs);
+        var logs = await logRepo.GetByDocumentIdAsync(id);
+        var dtos = mapper.Map<IEnumerable<ArchiveLogListItemDto>>(logs);
         return Ok(dtos);
     }
 }
