@@ -1,12 +1,21 @@
 ﻿using DocumentArchive.Core.Interfaces;
 using DocumentArchive.Core.Models;
+using DocumentArchive.Infrastructure.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace DocumentArchive.Infrastructure.Repositories;
 
 public class ArchiveLogRepository : FileStorageRepository<ArchiveLog>, IArchiveLogRepository
 {
-    public ArchiveLogRepository(string? dataDirectory = null)
+    // Для тестов
+    public ArchiveLogRepository(string? dataDirectory = null) 
         : base("logs.json", l => l.Id, dataDirectory)
+    {
+    }
+
+    // 🔸 Для DI
+    public ArchiveLogRepository(IOptions<StorageOptions> options) 
+        : base("logs.json", l => l.Id, options)
     {
     }
 

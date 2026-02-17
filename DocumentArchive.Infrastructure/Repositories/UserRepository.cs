@@ -1,15 +1,23 @@
 ﻿using DocumentArchive.Core.Interfaces;
 using DocumentArchive.Core.Models;
+using DocumentArchive.Infrastructure.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace DocumentArchive.Infrastructure.Repositories;
 
 public class UserRepository : FileStorageRepository<User>, IUserRepository
 {
-    public UserRepository(string? dataDirectory = null)
+    // Для тестов
+    public UserRepository(string? dataDirectory = null) 
         : base("users.json", u => u.Id, dataDirectory)
     {
     }
 
+    // Для DI
+    public UserRepository(IOptions<StorageOptions> options) 
+        : base("users.json", u => u.Id, options)
+    {
+    }
     public async Task<User?> FindByEmailAsync(string email)
     {
         return (await FindAsync(u => u.Email.Equals(email, StringComparison.OrdinalIgnoreCase))).FirstOrDefault();

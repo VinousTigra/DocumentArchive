@@ -1,5 +1,7 @@
 ﻿using System.Text.Json;
 using System.Collections.Concurrent;
+using DocumentArchive.Infrastructure.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace DocumentArchive.Infrastructure.Repositories;
 
@@ -10,7 +12,13 @@ public abstract class FileStorageRepository<T> where T : class
     private ConcurrentDictionary<Guid, T> _items = new();
     private readonly Func<T, Guid> _getId;
 
+    // Конструктор для использования с Options (из appsettings)
+    protected FileStorageRepository(string fileName, Func<T, Guid> getId, IOptions<StorageOptions> options)
+        : this(fileName, getId, options.Value.DataPath)
+    {
+    }
 
+    // Существующий конструктор для тестов (позволяет передать dataDirectory напрямую)
     protected FileStorageRepository(string fileName, Func<T, Guid> getId, string? dataDirectory = null)
     {
         var baseDirectory = dataDirectory ?? Path.Combine(Directory.GetCurrentDirectory(), "App_Data");

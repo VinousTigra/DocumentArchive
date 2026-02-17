@@ -1,12 +1,21 @@
 ﻿using DocumentArchive.Core.Interfaces;
 using DocumentArchive.Core.Models;
+using DocumentArchive.Infrastructure.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace DocumentArchive.Infrastructure.Repositories;
 
 public class CategoryRepository : FileStorageRepository<Category>, ICategoryRepository
 {
-    public CategoryRepository(string? dataDirectory = null)
+    // Для тестов
+    public CategoryRepository(string? dataDirectory = null) 
         : base("categories.json", c => c.Id, dataDirectory)
+    {
+    }
+
+    // 🔸 Для DI
+    public CategoryRepository(IOptions<StorageOptions> options) 
+        : base("categories.json", c => c.Id, options)
     {
     }
 

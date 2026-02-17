@@ -1,11 +1,20 @@
 ﻿using DocumentArchive.Core.Interfaces;
 using DocumentArchive.Core.Models;
+using DocumentArchive.Infrastructure.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace DocumentArchive.Infrastructure.Repositories;
 
 public class DocumentRepository : FileStorageRepository<Document>, IDocumentRepository
 {
-    public DocumentRepository(string? dataDirectory = null)
+    // Для DI (из appsettings)
+    public DocumentRepository(IOptions<StorageOptions> options) 
+        : base("documents.json", d => d.Id, options)
+    {
+    }
+
+    // Для тестов
+    public DocumentRepository(string? dataDirectory = null) 
         : base("documents.json", d => d.Id, dataDirectory)
     {
     }
