@@ -40,6 +40,8 @@ if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
     app.MapScalarApiReference();
+    // Добавляем лог со ссылкой
+    app.Logger.LogInformation("Scalar UI доступен по адресу http://localhost:5041/scalar/v1");
 }
 
 app.UseHttpsRedirection();
