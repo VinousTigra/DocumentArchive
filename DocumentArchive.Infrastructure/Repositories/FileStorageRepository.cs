@@ -10,7 +10,7 @@ public abstract class FileStorageRepository<T> where T : class
     private ConcurrentDictionary<Guid, T> _items = new();
     private readonly Func<T, Guid> _getId;
 
-    // Добавляем необязательный параметр dataDirectory
+
     protected FileStorageRepository(string fileName, Func<T, Guid> getId, string? dataDirectory = null)
     {
         var baseDirectory = dataDirectory ?? Path.Combine(Directory.GetCurrentDirectory(), "App_Data");
@@ -42,7 +42,6 @@ public abstract class FileStorageRepository<T> where T : class
             var list = _items.Values.ToList();
             var json = JsonSerializer.Serialize(list, new JsonSerializerOptions { WriteIndented = true });
 
-            // атомарная запись через временный файл
             var tempFile = _filePath + ".tmp";
             await File.WriteAllTextAsync(tempFile, json);
             File.Move(tempFile, _filePath, true);
@@ -55,8 +54,8 @@ public abstract class FileStorageRepository<T> where T : class
 
     public async Task<IEnumerable<T>> GetAllAsync() => await Task.FromResult(_items.Values);
 
-    public async Task<T?> GetByIdAsync(Guid id) =>
-        _items.TryGetValue(id, out var item) ? item : null;
+    public Task<T?> GetByIdAsync(Guid id) =>
+        Task.FromResult(_items.GetValueOrDefault(id));
 
     public async Task AddAsync(T entity)
     {
