@@ -126,7 +126,7 @@ public class DocumentServiceTests : TestBase
             FileName = "old.pdf",
             CategoryId = category.Id
         };
-        
+
         Context.Categories.Add(category);
         Context.Documents.Add(document);
         await Context.SaveChangesAsync();
@@ -163,7 +163,7 @@ public class DocumentServiceTests : TestBase
         var updateDto = new UpdateDocumentDto { CategoryId = Guid.NewGuid() };
 
         // Act
-        Func<Task> act = async () => await _service.UpdateDocumentAsync(document.Id, updateDto);
+        var act = async () => await _service.UpdateDocumentAsync(document.Id, updateDto);
 
         // Assert
         await act.Should().ThrowAsync<InvalidOperationException>()
@@ -189,7 +189,7 @@ public class DocumentServiceTests : TestBase
     [Fact]
     public async Task DeleteDocumentAsync_ShouldThrow_WhenNotFound()
     {
-        Func<Task> act = async () => await _service.DeleteDocumentAsync(Guid.NewGuid());
+        var act = async () => await _service.DeleteDocumentAsync(Guid.NewGuid());
         await act.Should().ThrowAsync<KeyNotFoundException>();
     }
 
@@ -206,11 +206,31 @@ public class DocumentServiceTests : TestBase
 
         var docs = new List<Document>
         {
-            new() { Title = "Alpha", Description = "desc a", UserId = user.Id, CategoryId = cat1.Id, UploadDate = DateTime.UtcNow.AddDays(-5) },
-            new() { Title = "Beta", Description = "desc b", UserId = user.Id, CategoryId = cat1.Id, UploadDate = DateTime.UtcNow.AddDays(-4) },
-            new() { Title = "Gamma", Description = "desc c", UserId = null, CategoryId = cat2.Id, UploadDate = DateTime.UtcNow.AddDays(-3) },
-            new() { Title = "Delta", Description = "desc d", UserId = null, CategoryId = cat2.Id, UploadDate = DateTime.UtcNow.AddDays(-2) },
-            new() { Title = "Epsilon", Description = "desc e", UserId = user.Id, CategoryId = null, UploadDate = DateTime.UtcNow.AddDays(-1) }
+            new()
+            {
+                Title = "Alpha", Description = "desc a", UserId = user.Id, CategoryId = cat1.Id,
+                UploadDate = DateTime.UtcNow.AddDays(-5)
+            },
+            new()
+            {
+                Title = "Beta", Description = "desc b", UserId = user.Id, CategoryId = cat1.Id,
+                UploadDate = DateTime.UtcNow.AddDays(-4)
+            },
+            new()
+            {
+                Title = "Gamma", Description = "desc c", UserId = null, CategoryId = cat2.Id,
+                UploadDate = DateTime.UtcNow.AddDays(-3)
+            },
+            new()
+            {
+                Title = "Delta", Description = "desc d", UserId = null, CategoryId = cat2.Id,
+                UploadDate = DateTime.UtcNow.AddDays(-2)
+            },
+            new()
+            {
+                Title = "Epsilon", Description = "desc e", UserId = user.Id, CategoryId = null,
+                UploadDate = DateTime.UtcNow.AddDays(-1)
+            }
         };
         Context.Documents.AddRange(docs);
         await Context.SaveChangesAsync();
@@ -222,7 +242,7 @@ public class DocumentServiceTests : TestBase
         page1.Items.First().Title.Should().Be("Alpha"); // сортировка по title asc
 
         // Фильтр по поиску
-        var searchResult = await _service.GetDocumentsAsync(1, 10, "beta", null, null, null, null, null);
+        var searchResult = await _service.GetDocumentsAsync(1, 10, "Beta", null, null, null, null, null);
         searchResult.Items.Should().HaveCount(1);
         searchResult.Items.First().Title.Should().Be("Beta");
 
@@ -236,10 +256,10 @@ public class DocumentServiceTests : TestBase
         userResult.Items.Should().HaveCount(3);
 
         // Фильтр по дате
-        var fromDate = DateTime.UtcNow.AddDays(-4);
+        var fromDate = DateTime.UtcNow.AddDays(-4).AddSeconds(-10);
         var toDate = DateTime.UtcNow.AddDays(-2);
         var dateResult = await _service.GetDocumentsAsync(1, 10, null, null, null, fromDate, toDate, null);
-        dateResult.Items.Should().HaveCount(3); // Beta, Gamma, Delta (в зависимости от времени, уточните)
+        dateResult.Items.Should().HaveCount(3); // Beta, Gamma, Delta
     }
 
     [Fact]

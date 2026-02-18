@@ -31,8 +31,7 @@ public class MappingProfile : Profile
             .ForMember(dest => dest.User, opt => opt.Ignore())
             .ForMember(dest => dest.Category, opt => opt.Ignore())
             .ForMember(dest => dest.Versions, opt => opt.Ignore())
-            .ForMember(dest => dest.Logs, opt => opt.Ignore())
-            .ForAllMembers(opts => opts.Condition((src, dest, srcMember) => srcMember != null));
+            .ForMember(dest => dest.Logs, opt => opt.Ignore());
 
         CreateMap<UpdateBulkDocumentDto, Document>()
             .ForMember(dest => dest.UploadDate, opt => opt.Ignore())
@@ -97,6 +96,7 @@ public class MappingProfile : Profile
 
         CreateMap<User, UserResponseDto>();
         CreateMap<User, UserListItemDto>();
+
 
 // Category
         CreateMap<CreateCategoryDto, Category>()
