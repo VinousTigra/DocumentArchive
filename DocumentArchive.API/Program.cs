@@ -1,34 +1,34 @@
-
 using DocumentArchive.API.Middleware;
+using DocumentArchive.Infrastructure.Data;
 using DocumentArchive.Infrastructure.DependencyInjection;
 using DocumentArchive.Services.DependencyInjection;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.OpenApi.Models;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Настройка контроллеров и JSON-сериализации
 builder.Services.AddControllers()
-    .AddJsonOptions(options =>
-    {
-        options.JsonSerializerOptions.WriteIndented = true;
-    });
+    .AddJsonOptions(options => { options.JsonSerializerOptions.WriteIndented = true; });
 
 // Передаём конфигурацию в метод расширения Infrastructure 
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddServices();
-
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 // Настройка OpenAPI (Scalar)
 builder.Services.AddOpenApi(options =>
 {
     options.AddDocumentTransformer((document, _, _) => // неиспользуемые параметры заменены на _
     {
-        document.Info = new()
+        document.Info = new OpenApiInfo
         {
             Title = "Electronic Archive API",
             Version = "v1",
             Description = "ASP.NET Core Web API для управления электронным архивом документов",
-            Contact = new()
+            Contact = new OpenApiContact
             {
                 Name = "Student Name",
                 Email = "student@example.com"
