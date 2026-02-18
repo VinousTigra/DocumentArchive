@@ -51,8 +51,9 @@ public class ArchiveLogRepository : FileStorageRepository<ArchiveLog>, IArchiveL
         logs = logs.OrderByDescending(l => l.Timestamp);
 
         // Пагинация
-        var totalCount = logs.Count();
-        var items = logs
+        var archiveLogs = logs as ArchiveLog[] ?? logs.ToArray();
+        var totalCount = archiveLogs.Count();
+        var items = archiveLogs
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToList();

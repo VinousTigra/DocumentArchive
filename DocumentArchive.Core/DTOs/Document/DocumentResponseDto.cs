@@ -1,6 +1,5 @@
 ﻿namespace DocumentArchive.Core.DTOs.Document;
 
-// DocumentResponseDto.cs
 public class DocumentResponseDto
 {
     public Guid Id { get; set; }

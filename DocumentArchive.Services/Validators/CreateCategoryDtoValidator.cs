@@ -1,5 +1,4 @@
 ﻿using DocumentArchive.Core.DTOs.Category;
-using DocumentArchive.Core.Interfaces;
 using DocumentArchive.Core.Interfaces.Repositorys;
 using FluentValidation;
 
@@ -7,18 +6,16 @@ namespace DocumentArchive.Services.Validators;
 
 public class CreateCategoryDtoValidator : AbstractValidator<CreateCategoryDto>
 {
-    private readonly ICategoryRepository _categoryRepo;
-
     public CreateCategoryDtoValidator(ICategoryRepository categoryRepo)
     {
-        _categoryRepo = categoryRepo;
+        var categoryRepo1 = categoryRepo;
 
         RuleFor(x => x.Name)
             .NotEmpty().WithMessage("Название категории обязательно")
             .MaximumLength(100).WithMessage("Название не должно превышать 100 символов")
             .MustAsync(async (name, cancellation) =>
             {
-                var category = await _categoryRepo.FindByNameAsync(name);
+                var category = await categoryRepo1.FindByNameAsync(name);
                 return category == null;
             })
             .WithMessage("Категория с таким названием уже существует");

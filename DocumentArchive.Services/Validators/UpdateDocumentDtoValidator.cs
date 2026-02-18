@@ -1,5 +1,4 @@
 ﻿using DocumentArchive.Core.DTOs.Document;
-using DocumentArchive.Core.Interfaces;
 using DocumentArchive.Core.Interfaces.Repositorys;
 using FluentValidation;
 
@@ -7,11 +6,9 @@ namespace DocumentArchive.Services.Validators;
 
 public class UpdateDocumentDtoValidator : AbstractValidator<UpdateDocumentDto>
 {
-    private readonly ICategoryRepository _categoryRepo;
-
     public UpdateDocumentDtoValidator(ICategoryRepository categoryRepo)
     {
-        _categoryRepo = categoryRepo;
+        var categoryRepo1 = categoryRepo;
 
         RuleFor(x => x.Title)
             .MaximumLength(200).When(x => x.Title != null)
@@ -22,10 +19,10 @@ public class UpdateDocumentDtoValidator : AbstractValidator<UpdateDocumentDto>
             .WithMessage("Имя файла не должно превышать 100 символов");
 
         RuleFor(x => x.CategoryId)
-            .MustAsync(async (id, cancellation) =>
+            .MustAsync(async (id, _) =>
             {
                 if (!id.HasValue) return true;
-                var category = await _categoryRepo.GetByIdAsync(id.Value);
+                var category = await categoryRepo1.GetByIdAsync(id.Value);
                 return category != null;
             })
             .WithMessage("Категория с указанным ID не существует");

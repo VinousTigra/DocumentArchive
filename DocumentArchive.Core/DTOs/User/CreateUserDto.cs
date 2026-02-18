@@ -1,5 +1,4 @@
-﻿// DocumentArchive.Core/DTOs/User/CreateUserDto.cs
-namespace DocumentArchive.Core.DTOs.User;
+﻿namespace DocumentArchive.Core.DTOs.User;
 
 public class CreateUserDto
 {

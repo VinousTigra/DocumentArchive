@@ -11,7 +11,7 @@ public class MappingProfile : Profile
 {
     public MappingProfile()
     {
-        // ========== Document ==========
+        //  Document
         CreateMap<CreateDocumentDto, Document>()
             .ForMember(dest => dest.Id, opt => opt.Ignore())
             .ForMember(dest => dest.UploadDate, opt => opt.Ignore())
@@ -46,7 +46,7 @@ public class MappingProfile : Profile
             .ForMember(dest => dest.CategoryName,
                 opt => opt.MapFrom(src => src.Category != null ? src.Category.Name : "Без категории"));
 
-        // ========== User ==========
+        // User
         CreateMap<CreateUserDto, User>()
             .ForMember(dest => dest.Id, opt => opt.Ignore())
             .ForMember(dest => dest.CreatedAt, opt => opt.Ignore())
@@ -65,7 +65,7 @@ public class MappingProfile : Profile
         CreateMap<User, UserResponseDto>();
         CreateMap<User, UserListItemDto>();
 
-        // ========== Category ==========
+        // Category 
         CreateMap<CreateCategoryDto, Category>()
             .ForMember(dest => dest.Id, opt => opt.Ignore())
             .ForMember(dest => dest.CreatedAt, opt => opt.Ignore())
@@ -80,7 +80,7 @@ public class MappingProfile : Profile
         CreateMap<Category, CategoryResponseDto>();
         CreateMap<Category, CategoryListItemDto>();
 
-        // ========== ArchiveLog ==========
+        // ArchiveLog
         CreateMap<CreateArchiveLogDto, ArchiveLog>()
             .ForMember(dest => dest.Id, opt => opt.Ignore())
             .ForMember(dest => dest.Timestamp, opt => opt.Ignore())

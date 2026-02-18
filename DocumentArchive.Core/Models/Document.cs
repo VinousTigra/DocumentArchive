@@ -16,6 +16,6 @@ public class Document
     public Guid? CategoryId { get; set; }
     public Category? Category { get; set; }
 
-    // Бизнес-логика (пример)
+    // Бизнес-логика 
     public bool CanBeDeleted() => (DateTime.UtcNow - UploadDate).TotalDays < 30;
 }

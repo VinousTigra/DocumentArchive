@@ -1,21 +1,17 @@
 ﻿using DocumentArchive.Core.DTOs.Document;
-using DocumentArchive.Core.Interfaces;
-using DocumentArchive.Core.Interfaces.Repositorys; // <-- добавить
+using DocumentArchive.Core.Interfaces.Repositorys;
 using FluentValidation;
 
 namespace DocumentArchive.Services.Validators;
 
 public class CreateDocumentDtoValidator : AbstractValidator<CreateDocumentDto>
 {
-    private readonly ICategoryRepository _categoryRepo;   // <-- интерфейс
-    private readonly IUserRepository _userRepo;           // <-- интерфейс
-
     public CreateDocumentDtoValidator(
-        ICategoryRepository categoryRepo,    // <-- интерфейс
-        IUserRepository userRepo)           // <-- интерфейс
+        ICategoryRepository categoryRepo,    
+        IUserRepository userRepo)           
     {
-        _categoryRepo = categoryRepo;
-        _userRepo = userRepo;
+        var categoryRepo1 = categoryRepo;
+        var userRepo1 = userRepo;
 
         RuleFor(x => x.Title)
             .NotEmpty().WithMessage("Название документа обязательно")
@@ -26,19 +22,19 @@ public class CreateDocumentDtoValidator : AbstractValidator<CreateDocumentDto>
             .MaximumLength(100).WithMessage("Имя файла не должно превышать 100 символов");
 
         RuleFor(x => x.CategoryId)
-            .MustAsync(async (id, cancellation) =>
+            .MustAsync(async (id, _) =>
             {
                 if (!id.HasValue) return true;
-                var category = await _categoryRepo.GetByIdAsync(id.Value);
+                var category = await categoryRepo1.GetByIdAsync(id.Value);
                 return category != null;
             })
             .WithMessage("Категория с указанным ID не существует");
 
         RuleFor(x => x.UserId)
-            .MustAsync(async (id, cancellation) =>
+            .MustAsync(async (id, _) =>
             {
                 if (!id.HasValue) return true;
-                var user = await _userRepo.GetByIdAsync(id.Value);
+                var user = await userRepo1.GetByIdAsync(id.Value);
                 return user != null;
             })
             .WithMessage("Пользователь с указанным ID не существует");

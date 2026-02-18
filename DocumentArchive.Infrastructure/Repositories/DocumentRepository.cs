@@ -46,7 +46,7 @@ public class DocumentRepository : FileStorageRepository<Document>, IDocumentRepo
         // Получаем все документы
         var documents = await GetAllAsync(cancellationToken);
 
-        // ---- Фильтрация ----
+        // Фильтрация 
         if (!string.IsNullOrWhiteSpace(search))
         {
             var lowerSearch = search.ToLowerInvariant();
@@ -55,8 +55,12 @@ public class DocumentRepository : FileStorageRepository<Document>, IDocumentRepo
                 (d.Description?.ToLowerInvariant().Contains(lowerSearch) ?? false));
         }
 
-        if (categoryIds != null && categoryIds.Any())
-            documents = documents.Where(d => d.CategoryId.HasValue && categoryIds.Contains(d.CategoryId.Value));
+        if (categoryIds != null)
+        {
+            var guids = categoryIds as Guid[] ?? categoryIds.ToArray();
+            if (guids.Any())
+                documents = documents.Where(d => d.CategoryId.HasValue && guids.Contains(d.CategoryId.Value));
+        }
 
         if (userId.HasValue)
             documents = documents.Where(d => d.UserId == userId);
@@ -67,8 +71,9 @@ public class DocumentRepository : FileStorageRepository<Document>, IDocumentRepo
         if (toDate.HasValue)
             documents = documents.Where(d => d.UploadDate <= toDate.Value);
 
-        // ---- Сортировка ----
+        //  Сортировка 
         IOrderedEnumerable<Document>? ordered = null;
+        var enumerable = documents as Document[] ?? documents.ToArray();
         if (!string.IsNullOrWhiteSpace(sort))
         {
             var sortFields = sort.Split(',');
@@ -88,8 +93,8 @@ public class DocumentRepository : FileStorageRepository<Document>, IDocumentRepo
 
                 if (ordered == null)
                     ordered = direction == "asc"
-                        ? documents.OrderBy(keySelector)
-                        : documents.OrderByDescending(keySelector);
+                        ? enumerable.OrderBy(keySelector)
+                        : enumerable.OrderByDescending(keySelector);
                 else
                     ordered = direction == "asc"
                         ? ordered.ThenBy(keySelector)
@@ -98,10 +103,10 @@ public class DocumentRepository : FileStorageRepository<Document>, IDocumentRepo
         }
 
         // Если сортировка не указана – сортируем по дате загрузки по убыванию
-        var sortedDocuments = ordered ?? documents.OrderByDescending(d => d.UploadDate);
+        var sortedDocuments = ordered ?? enumerable.OrderByDescending(d => d.UploadDate);
 
-        // ---- Пагинация ----
-        var totalCount = documents.Count(); // количество после фильтрации
+        //  Пагинация 
+        var totalCount = enumerable.Count(); // количество после фильтрации
         var items = sortedDocuments
             .Skip((page - 1) * pageSize)
             .Take(pageSize)

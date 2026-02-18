@@ -41,8 +41,9 @@ public class UserRepository : FileStorageRepository<User>, IUserRepository
         users = users.OrderBy(u => u.Username);
 
         // Пагинация
-        var totalCount = users.Count();
-        var items = users
+        var enumerable = users as User[] ?? users.ToArray();
+        var totalCount = enumerable.Count();
+        var items = enumerable
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToList();

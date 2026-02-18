@@ -1,5 +1,4 @@
 ﻿using DocumentArchive.Core.DTOs.User;
-using DocumentArchive.Core.Interfaces;
 using DocumentArchive.Core.Interfaces.Repositorys;
 using FluentValidation;
 

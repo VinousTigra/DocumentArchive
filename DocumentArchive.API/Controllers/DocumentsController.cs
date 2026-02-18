@@ -265,7 +265,7 @@ public class DocumentsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<BulkOperationResult<Guid>>> CreateBulk(
-        [FromBody] List<CreateDocumentDto> createDtos,
+        [FromBody] List<CreateDocumentDto>? createDtos,
         CancellationToken cancellationToken = default)
     {
         if (createDtos == null || createDtos.Count == 0)
@@ -300,7 +300,7 @@ public class DocumentsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<BulkOperationResult<Guid>>> UpdateBulk(
-        [FromBody] List<UpdateBulkDocumentDto> updateDtos,
+        [FromBody] List<UpdateBulkDocumentDto>? updateDtos,
         CancellationToken cancellationToken = default)
     {
         if (updateDtos == null || updateDtos.Count == 0)
@@ -333,7 +333,7 @@ public class DocumentsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<BulkOperationResult<Guid>>> DeleteBulk(
-        [FromBody] Guid[] ids,
+        [FromBody] Guid[]? ids,
         CancellationToken cancellationToken = default)
     {
         if (ids == null || ids.Length == 0)

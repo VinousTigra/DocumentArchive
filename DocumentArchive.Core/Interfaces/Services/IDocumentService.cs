@@ -1,5 +1,4 @@
-﻿// DocumentArchive.Core/Interfaces/Services/IDocumentService.cs
-using DocumentArchive.Core.DTOs.ArchiveLog;
+﻿using DocumentArchive.Core.DTOs.ArchiveLog;
 using DocumentArchive.Core.DTOs.Document;
 using DocumentArchive.Core.DTOs.Shared;
 
@@ -11,12 +10,12 @@ public interface IDocumentService
         int page,
         int pageSize,
         string? search,
-        Guid[]? categoryIds,           // изменено
+        Guid[]? categoryIds,           
         Guid? userId,
         DateTime? fromDate,
         DateTime? toDate,
         string? sort,
-        CancellationToken cancellationToken = default);  // добавлен токен
+        CancellationToken cancellationToken = default); 
 
     Task<DocumentResponseDto?> GetDocumentByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<DocumentResponseDto> CreateDocumentAsync(CreateDocumentDto createDto, CancellationToken cancellationToken = default);

@@ -52,8 +52,9 @@ public class CategoryRepository : FileStorageRepository<Category>, ICategoryRepo
         };
 
         // Пагинация
-        var totalCount = categories.Count();
-        var items = categories
+        var enumerable = categories as Category[] ?? categories.ToArray();
+        var totalCount = enumerable.Count();
+        var items = enumerable
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToList();
