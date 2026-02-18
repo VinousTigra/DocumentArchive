@@ -1,14 +1,17 @@
 ﻿using DocumentArchive.Core.DTOs.Document;
-using DocumentArchive.Core.Interfaces.Repositorys;
+using DocumentArchive.Infrastructure.Data;
 using FluentValidation;
+using Microsoft.EntityFrameworkCore;
 
 namespace DocumentArchive.Services.Validators;
 
 public class UpdateDocumentDtoValidator : AbstractValidator<UpdateDocumentDto>
 {
-    public UpdateDocumentDtoValidator(ICategoryRepository categoryRepo)
+    private readonly AppDbContext _context;
+
+    public UpdateDocumentDtoValidator(AppDbContext context)
     {
-        var categoryRepo1 = categoryRepo;
+        _context = context;
 
         RuleFor(x => x.Title)
             .MaximumLength(200).When(x => x.Title != null)
@@ -19,12 +22,14 @@ public class UpdateDocumentDtoValidator : AbstractValidator<UpdateDocumentDto>
             .WithMessage("Имя файла не должно превышать 100 символов");
 
         RuleFor(x => x.CategoryId)
-            .MustAsync(async (id, _) =>
-            {
-                if (!id.HasValue) return true;
-                var category = await categoryRepo1.GetByIdAsync(id.Value);
-                return category != null;
-            })
-            .WithMessage("Категория с указанным ID не существует");
+            .MustAsync(BeExistingCategory)
+            .WithMessage("Категория с указанным ID не существует")
+            .When(x => x.CategoryId.HasValue);
+    }
+
+    private async Task<bool> BeExistingCategory(Guid? categoryId, CancellationToken cancellationToken)
+    {
+        if (!categoryId.HasValue) return true;
+        return await _context.Categories.AnyAsync(c => c.Id == categoryId.Value, cancellationToken);
     }
 }

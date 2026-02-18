@@ -1,15 +1,17 @@
 using DocumentArchive.Core.DTOs.ArchiveLog;
-using DocumentArchive.Core.Interfaces.Repositorys;
+using DocumentArchive.Infrastructure.Data;
 using FluentValidation;
+using Microsoft.EntityFrameworkCore;
 
 namespace DocumentArchive.Services.Validators;
 
 public class CreateArchiveLogDtoValidator : AbstractValidator<CreateArchiveLogDto>
 {
-    public CreateArchiveLogDtoValidator(IDocumentRepository documentRepo, IUserRepository userRepo)
+    private readonly AppDbContext _context;
+
+    public CreateArchiveLogDtoValidator(AppDbContext context)
     {
-        var documentRepo1 = documentRepo;
-        var userRepo1 = userRepo;
+        _context = context;
 
         RuleFor(x => x.Action)
             .NotEmpty().WithMessage("Action is required.")
@@ -20,20 +22,22 @@ public class CreateArchiveLogDtoValidator : AbstractValidator<CreateArchiveLogDt
 
         RuleFor(x => x.DocumentId)
             .NotEmpty().WithMessage("Document ID is required.")
-            .MustAsync(async (id, cancellation) =>
-            {
-                var document = await documentRepo1.GetByIdAsync(id, cancellation);
-                return document != null;
-            })
+            .MustAsync(BeExistingDocument)
             .WithMessage("Document with the specified ID does not exist.");
 
         RuleFor(x => x.UserId)
             .NotEmpty().WithMessage("User ID is required.")
-            .MustAsync(async (id, cancellation) =>
-            {
-                var user = await userRepo1.GetByIdAsync(id, cancellation);
-                return user != null;
-            })
+            .MustAsync(BeExistingUser)
             .WithMessage("User with the specified ID does not exist.");
+    }
+
+    private async Task<bool> BeExistingDocument(Guid documentId, CancellationToken cancellationToken)
+    {
+        return await _context.Documents.AnyAsync(d => d.Id == documentId, cancellationToken);
+    }
+
+    private async Task<bool> BeExistingUser(Guid userId, CancellationToken cancellationToken)
+    {
+        return await _context.Users.AnyAsync(u => u.Id == userId, cancellationToken);
     }
 }

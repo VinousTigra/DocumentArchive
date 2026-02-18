@@ -1,14 +1,17 @@
 ﻿using DocumentArchive.Core.DTOs.User;
-using DocumentArchive.Core.Interfaces.Repositorys;
+using DocumentArchive.Infrastructure.Data;
 using FluentValidation;
+using Microsoft.EntityFrameworkCore;
 
 namespace DocumentArchive.Services.Validators;
 
 public class CreateUserDtoValidator : AbstractValidator<CreateUserDto>
 {
-    public CreateUserDtoValidator(IUserRepository userRepo)
+    private readonly AppDbContext _context;
+
+    public CreateUserDtoValidator(AppDbContext context)
     {
-        var userRepo1 = userRepo;
+        _context = context;
 
         RuleFor(x => x.Username)
             .NotEmpty().WithMessage("Имя пользователя обязательно")
@@ -18,11 +21,11 @@ public class CreateUserDtoValidator : AbstractValidator<CreateUserDto>
             .NotEmpty().WithMessage("Email обязателен")
             .EmailAddress().WithMessage("Некорректный формат email")
             .MaximumLength(100).WithMessage("Email не должен превышать 100 символов")
-            .MustAsync(async (email, _) =>
-            {
-                var user = await userRepo1.FindByEmailAsync(email);
-                return user == null;
-            })
-            .WithMessage("Пользователь с таким email уже существует");
+            .MustAsync(BeUniqueEmail).WithMessage("Пользователь с таким email уже существует");
+    }
+
+    private async Task<bool> BeUniqueEmail(string email, CancellationToken cancellationToken)
+    {
+        return !await _context.Users.AnyAsync(u => u.Email == email, cancellationToken);
     }
 }

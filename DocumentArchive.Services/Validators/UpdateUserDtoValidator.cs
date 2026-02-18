@@ -1,17 +1,13 @@
 ﻿using DocumentArchive.Core.DTOs.User;
-using DocumentArchive.Core.Interfaces.Repositorys;
+using DocumentArchive.Infrastructure.Data;
 using FluentValidation;
 
 namespace DocumentArchive.Services.Validators;
 
 public class UpdateUserDtoValidator : AbstractValidator<UpdateUserDto>
 {
-    private readonly IUserRepository _userRepo;
-
-    public UpdateUserDtoValidator(IUserRepository userRepo)
+    public UpdateUserDtoValidator(AppDbContext context)
     {
-        _userRepo = userRepo;
-
         RuleFor(x => x.Username)
             .MaximumLength(50).When(x => x.Username != null)
             .WithMessage("Имя пользователя не должно превышать 50 символов");

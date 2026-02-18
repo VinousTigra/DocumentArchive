@@ -1,17 +1,17 @@
 ﻿using DocumentArchive.Core.DTOs.Document;
-using DocumentArchive.Core.Interfaces.Repositorys;
+using DocumentArchive.Infrastructure.Data;
 using FluentValidation;
+using Microsoft.EntityFrameworkCore;
 
 namespace DocumentArchive.Services.Validators;
 
 public class CreateDocumentDtoValidator : AbstractValidator<CreateDocumentDto>
 {
-    public CreateDocumentDtoValidator(
-        ICategoryRepository categoryRepo,    
-        IUserRepository userRepo)           
+    private readonly AppDbContext _context;
+
+    public CreateDocumentDtoValidator(AppDbContext context)
     {
-        var categoryRepo1 = categoryRepo;
-        var userRepo1 = userRepo;
+        _context = context;
 
         RuleFor(x => x.Title)
             .NotEmpty().WithMessage("Название документа обязательно")
@@ -22,21 +22,25 @@ public class CreateDocumentDtoValidator : AbstractValidator<CreateDocumentDto>
             .MaximumLength(100).WithMessage("Имя файла не должно превышать 100 символов");
 
         RuleFor(x => x.CategoryId)
-            .MustAsync(async (id, _) =>
-            {
-                if (!id.HasValue) return true;
-                var category = await categoryRepo1.GetByIdAsync(id.Value);
-                return category != null;
-            })
-            .WithMessage("Категория с указанным ID не существует");
+            .MustAsync(BeExistingCategory)
+            .WithMessage("Категория с указанным ID не существует")
+            .When(x => x.CategoryId.HasValue); // проверяем только если ID указан
 
         RuleFor(x => x.UserId)
-            .MustAsync(async (id, _) =>
-            {
-                if (!id.HasValue) return true;
-                var user = await userRepo1.GetByIdAsync(id.Value);
-                return user != null;
-            })
-            .WithMessage("Пользователь с указанным ID не существует");
+            .MustAsync(BeExistingUser)
+            .WithMessage("Пользователь с указанным ID не существует")
+            .When(x => x.UserId.HasValue);
+    }
+
+    private async Task<bool> BeExistingCategory(Guid? categoryId, CancellationToken cancellationToken)
+    {
+        if (!categoryId.HasValue) return true;
+        return await _context.Categories.AnyAsync(c => c.Id == categoryId.Value, cancellationToken);
+    }
+
+    private async Task<bool> BeExistingUser(Guid? userId, CancellationToken cancellationToken)
+    {
+        if (!userId.HasValue) return true;
+        return await _context.Users.AnyAsync(u => u.Id == userId.Value, cancellationToken);
     }
 }

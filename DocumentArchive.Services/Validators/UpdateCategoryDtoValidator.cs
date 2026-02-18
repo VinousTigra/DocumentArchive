@@ -1,17 +1,14 @@
 ﻿using DocumentArchive.Core.DTOs.Category;
-using DocumentArchive.Core.Interfaces.Repositorys;
+using DocumentArchive.Infrastructure.Data;
 using FluentValidation;
 
 namespace DocumentArchive.Services.Validators;
 
 public class UpdateCategoryDtoValidator : AbstractValidator<UpdateCategoryDto>
 {
-    private readonly ICategoryRepository _categoryRepo;
-
-    public UpdateCategoryDtoValidator(ICategoryRepository categoryRepo)
+    public UpdateCategoryDtoValidator(AppDbContext context)
     {
-        _categoryRepo = categoryRepo;
-
+        // Для обновления проверяем только длину, так как имя может не меняться
         RuleFor(x => x.Name)
             .MaximumLength(100).When(x => x.Name != null)
             .WithMessage("Название не должно превышать 100 символов");
