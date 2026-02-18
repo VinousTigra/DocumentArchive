@@ -167,7 +167,7 @@ public class UserServiceTests : TestBase
         var updateDto = new UpdateUserDto { Email = "u2@t.com" }; // пытаемся дать user1 email user2
 
         // Act
-        Func<Task> act = async () => await _service.UpdateUserAsync(user1.Id, updateDto);
+        var act = async () => await _service.UpdateUserAsync(user1.Id, updateDto);
 
         // Assert
         await act.Should().ThrowAsync<InvalidOperationException>()
@@ -208,7 +208,7 @@ public class UserServiceTests : TestBase
         await Context.SaveChangesAsync();
 
         // Act
-        Func<Task> act = async () => await _service.DeleteUserAsync(user.Id);
+        var act = async () => await _service.DeleteUserAsync(user.Id);
 
         // Assert
         await act.Should().ThrowAsync<InvalidOperationException>()
@@ -219,8 +219,7 @@ public class UserServiceTests : TestBase
     public async Task GetUsersAsync_ShouldReturnPagedFiltered()
     {
         // Arrange
-        for (int i = 1; i <= 5; i++)
-        {
+        for (var i = 1; i <= 5; i++)
             Context.Users.Add(new User
             {
                 Id = Guid.NewGuid(),
@@ -228,10 +227,11 @@ public class UserServiceTests : TestBase
                 Email = $"user{i}@t.com",
                 IsDeleted = false
             });
-        }
         // Добавим удалённого, он не должен попасть в выборку
-        Context.Users.Add(new User { Id = Guid.NewGuid(), Username = "deleted", Email = "del@t.com", IsDeleted = true });
-        await Context.SaveChangesAsync();
+        Context.Users.Add(new User
+            { Id = Guid.NewGuid(), Username = "deleted", Email = "del@t.com", IsDeleted = true });
+
+        await Context.SaveChangesAsync(); // <-- добавить эту строку
 
         // Act
         var result = await _service.GetUsersAsync(1, 3, null);
@@ -261,10 +261,7 @@ public class UserServiceTests : TestBase
         Context.Users.Add(user);
         await Context.SaveChangesAsync();
 
-        for (int i = 0; i < 7; i++)
-        {
-            Context.Documents.Add(new Document { Title = $"Doc{i}", UserId = user.Id });
-        }
+        for (var i = 0; i < 7; i++) Context.Documents.Add(new Document { Title = $"Doc{i}", UserId = user.Id });
         await Context.SaveChangesAsync();
 
         // Act
@@ -286,10 +283,25 @@ public class UserServiceTests : TestBase
         // Arrange
         var today = DateTime.UtcNow.Date;
         Context.Users.AddRange(
-            new User { CreatedAt = today.AddDays(-1), LastLoginAt = DateTime.UtcNow, IsDeleted = false },
-            new User { CreatedAt = today.AddDays(-1), LastLoginAt = DateTime.UtcNow.AddDays(-1), IsDeleted = false },
-            new User { CreatedAt = today, LastLoginAt = null, IsDeleted = false },
-            new User { CreatedAt = today.AddDays(-5), LastLoginAt = DateTime.UtcNow, IsDeleted = true } // не должен считаться
+            new User
+            {
+                Username = "user1", Email = "user1@test.com", CreatedAt = today.AddDays(-1),
+                LastLoginAt = DateTime.UtcNow, IsDeleted = false
+            },
+            new User
+            {
+                Username = "user2", Email = "user2@test.com", CreatedAt = today.AddDays(-1),
+                LastLoginAt = DateTime.UtcNow.AddDays(-1), IsDeleted = false
+            },
+            new User
+            {
+                Username = "user3", Email = "user3@test.com", CreatedAt = today, LastLoginAt = null, IsDeleted = false
+            },
+            new User
+            {
+                Username = "user4", Email = "user4@test.com", CreatedAt = today.AddDays(-5),
+                LastLoginAt = DateTime.UtcNow, IsDeleted = true
+            } // не должен считаться
         );
         await Context.SaveChangesAsync();
 
@@ -308,10 +320,7 @@ public class UserServiceTests : TestBase
         // Arrange
         var user = new User { Id = Guid.NewGuid(), Username = "u", Email = "u@t.com" };
         Context.Users.Add(user);
-        for (int i = 0; i < 10; i++)
-        {
-            Context.Documents.Add(new Document { Title = $"Doc{i}", UserId = user.Id });
-        }
+        for (var i = 0; i < 10; i++) Context.Documents.Add(new Document { Title = $"Doc{i}", UserId = user.Id });
         await Context.SaveChangesAsync();
 
         // Act

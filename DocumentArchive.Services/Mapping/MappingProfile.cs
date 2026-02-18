@@ -95,6 +95,9 @@ public class MappingProfile : Profile
             .ForMember(dest => dest.IsDeleted, opt => opt.Ignore())
             .ForAllMembers(opts => opts.Condition((src, dest, srcMember) => srcMember != null));
 
+        CreateMap<User, UserResponseDto>();
+        CreateMap<User, UserListItemDto>();
+
 // Category
         CreateMap<CreateCategoryDto, Category>()
             .ForMember(dest => dest.Id, opt => opt.Ignore())

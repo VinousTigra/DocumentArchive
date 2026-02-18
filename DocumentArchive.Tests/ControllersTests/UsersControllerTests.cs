@@ -15,23 +15,22 @@ namespace DocumentArchive.Tests.ControllersTests;
 
 public class UsersControllerTests
 {
-    private readonly Mock<IUserService> _userServiceMock;
+    private readonly UsersController _controller;
     private readonly Mock<IValidator<CreateUserDto>> _createValidatorMock;
     private readonly Mock<IValidator<UpdateUserDto>> _updateValidatorMock;
-    private readonly Mock<ILogger<UsersController>> _loggerMock;
-    private readonly UsersController _controller;
+    private readonly Mock<IUserService> _userServiceMock;
 
     public UsersControllerTests()
     {
         _userServiceMock = new Mock<IUserService>();
         _createValidatorMock = new Mock<IValidator<CreateUserDto>>();
         _updateValidatorMock = new Mock<IValidator<UpdateUserDto>>();
-        _loggerMock = new Mock<ILogger<UsersController>>();
+        var loggerMock = new Mock<ILogger<UsersController>>();
         _controller = new UsersController(
             _userServiceMock.Object,
             _createValidatorMock.Object,
             _updateValidatorMock.Object,
-            _loggerMock.Object);
+            loggerMock.Object);
     }
 
     [Fact]
@@ -51,7 +50,7 @@ public class UsersControllerTests
     [Fact]
     public async Task GetAll_ShouldReturnBadRequest_WhenPageLessThan1()
     {
-        var result = await _controller.GetAll(page: 0);
+        var result = await _controller.GetAll(0);
         var badRequest = result.Result as BadRequestObjectResult;
         badRequest.Should().NotBeNull();
         badRequest!.StatusCode.Should().Be(400);
@@ -88,7 +87,7 @@ public class UsersControllerTests
     {
         var userId = Guid.NewGuid();
         _userServiceMock.Setup(x => x.GetUserByIdAsync(userId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((UserResponseDto?)null);
+            .ReturnsAsync((UserResponseDto)null);
 
         var result = await _controller.GetById(userId);
         result.Result.Should().BeOfType<NotFoundResult>();
@@ -132,8 +131,10 @@ public class UsersControllerTests
         badRequest.Should().NotBeNull();
         badRequest!.StatusCode.Should().Be(400);
         var errors = badRequest.Value as IEnumerable<ValidationFailure>;
-        errors.Should().NotBeNull();
-        errors!.Select(e => e.ErrorMessage).Should().Contain(new[] { "Username is required", "Invalid email format" });
+        var enumerable = errors as ValidationFailure[] ?? errors.ToArray();
+        enumerable.Should().NotBeNull();
+        enumerable!.Select(e => e.ErrorMessage).Should()
+            .Contain(new[] { "Username is required", "Invalid email format" });
     }
 
     [Fact]
@@ -251,7 +252,7 @@ public class UsersControllerTests
     [Fact]
     public async Task GetUserDocuments_ShouldReturnBadRequest_WhenPageInvalid()
     {
-        var result = await _controller.GetUserDocuments(Guid.NewGuid(), page: 0);
+        var result = await _controller.GetUserDocuments(Guid.NewGuid(), 0);
         var badRequest = result.Result as BadRequestObjectResult;
         badRequest.Should().NotBeNull();
         badRequest!.StatusCode.Should().Be(400);
