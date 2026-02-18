@@ -6,7 +6,12 @@
 	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=29fd8dd3_002D3a41_002D4e5b_002Da681_002D33531c1b027e/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" Name="All tests from &amp;lt;DocumentArchive.Tests&amp;gt;" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;&#xD;
   &lt;Project Location="C:\Users\Tigra\Documents\Учеба\Dev\РСЧВП\DocumentArchive\DocumentArchive.Tests" Presentation="&amp;lt;DocumentArchive.Tests&amp;gt;" /&gt;&#xD;
 &lt;/SessionState&gt;</s:String>
-	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=d3137b68_002De326_002D456c_002Dbd02_002Dc289405aabea/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" IsActive="True" Name="All tests from &amp;lt;DocumentArchive.Tests&amp;gt; #2" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;&#xD;
+	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=8f1eedae_002D2e51_002D4533_002D83b0_002Dcf868333efdb/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" IsActive="True" Name="GetLogsAsync_ShouldReturnPagedFiltered" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;&#xD;
+  &lt;TestAncestor&gt;&#xD;
+    &lt;TestId&gt;xUnit::61ED77E8-8BA3-4579-8F2A-1AEF5EF1D9A4::net9.0::DocumentArchive.Tests.ServicesTests.ArchiveLogServiceTests.GetLogsAsync_ShouldReturnPagedFiltered&lt;/TestId&gt;&#xD;
+  &lt;/TestAncestor&gt;&#xD;
+&lt;/SessionState&gt;</s:String>
+	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=d3137b68_002De326_002D456c_002Dbd02_002Dc289405aabea/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" Name="All tests from &amp;lt;DocumentArchive.Tests&amp;gt; #2" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;&#xD;
   &lt;Project Location="C:\Users\Tigra\Documents\Учеба\Dev\РСЧВП\DocumentArchive\DocumentArchive.Tests" Presentation="&amp;lt;DocumentArchive.Tests&amp;gt;" /&gt;&#xD;
 &lt;/SessionState&gt;</s:String>
 	</wpf:ResourceDictionary>

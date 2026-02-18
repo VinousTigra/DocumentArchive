@@ -118,8 +118,10 @@ public class ArchiveLogServiceTests : TestBase
     public async Task GetLogsAsync_ShouldReturnPagedFiltered()
     {
         // Arrange
-        var user1 = new User { Id = Guid.NewGuid(), Username = "u1" };
-        var user2 = new User { Id = Guid.NewGuid(), Username = "u2" };
+        var fixedTime = new DateTime(2025, 1, 10, 12, 0, 0, DateTimeKind.Utc); // базовая дата
+
+        var user1 = new User { Id = Guid.NewGuid(), Username = "u1", Email = "u1@test.com" };
+        var user2 = new User { Id = Guid.NewGuid(), Username = "u2", Email = "u2@test.com" };
         var doc = new Document { Id = Guid.NewGuid(), Title = "Doc", FileName = "doc.pdf" };
         Context.Users.AddRange(user1, user2);
         Context.Documents.Add(doc);
@@ -127,15 +129,29 @@ public class ArchiveLogServiceTests : TestBase
 
         var logs = new List<ArchiveLog>
         {
-            new() { Action = "Create", ActionType = ActionType.Created, UserId = user1.Id, DocumentId = doc.Id, Timestamp = DateTime.UtcNow.AddDays(-3) },
-            new() { Action = "Update", ActionType = ActionType.Updated, UserId = user1.Id, DocumentId = doc.Id, Timestamp = DateTime.UtcNow.AddDays(-2), IsCritical = true },
-            new() { Action = "Delete", ActionType = ActionType.Deleted, UserId = user2.Id, DocumentId = doc.Id, Timestamp = DateTime.UtcNow.AddDays(-1), IsCritical = false }
+            new()
+            {
+                Action = "Create", ActionType = ActionType.Created, UserId = user1.Id, DocumentId = doc.Id,
+                Timestamp = fixedTime.AddDays(-3)
+            },
+            new()
+            {
+                Action = "Update", ActionType = ActionType.Updated, UserId = user1.Id, DocumentId = doc.Id,
+                Timestamp = fixedTime.AddDays(-2), IsCritical = true
+            },
+            new()
+            {
+                Action = "Delete", ActionType = ActionType.Deleted, UserId = user2.Id, DocumentId = doc.Id,
+                Timestamp = fixedTime.AddDays(-1), IsCritical = false
+            }
         };
         Context.ArchiveLogs.AddRange(logs);
         await Context.SaveChangesAsync();
 
         // Act: пагинация
         var page1 = await _service.GetLogsAsync(1, 2, null, null, null, null, null, null);
+
+        // Assert
         page1.Items.Should().HaveCount(2);
         page1.TotalCount.Should().Be(3);
 
@@ -148,11 +164,12 @@ public class ArchiveLogServiceTests : TestBase
         typeLogs.Items.Should().HaveCount(1);
         typeLogs.Items.First().ActionType.Should().Be(ActionType.Created);
 
-        // Фильтр по дате
-        var from = DateTime.UtcNow.AddDays(-2);
-        var to = DateTime.UtcNow;
+        // Фильтр по дате (используем фиксированное время)
+        var from = fixedTime.AddDays(-2);
+        var to = fixedTime;
         var dateLogs = await _service.GetLogsAsync(1, 10, null, null, from, to, null, null);
-        dateLogs.Items.Should().HaveCount(2); // update и delete
+        dateLogs.Items.Should().HaveCount(2); // Update и Delete (с -2 и -1 дней)
+        dateLogs.Items.Select(l => l.Action).Should().Contain(new[] { "Update", "Delete" });
 
         // Фильтр по критичности
         var critical = await _service.GetLogsAsync(1, 10, null, null, null, null, null, true);

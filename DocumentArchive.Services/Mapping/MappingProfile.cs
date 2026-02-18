@@ -54,7 +54,7 @@ public class MappingProfile : Profile
         CreateMap<Document, DocumentListItemDto>()
             .ForMember(dest => dest.CategoryName,
                 opt => opt.MapFrom(src => src.Category != null ? src.Category.Name : "Без категории"));
- 
+
         // ===== User =====
         CreateMap<CreateUserDto, User>()
             .ForMember(dest => dest.Id, opt => opt.Ignore())
@@ -95,18 +95,16 @@ public class MappingProfile : Profile
             .ForMember(dest => dest.IsDeleted, opt => opt.Ignore())
             .ForAllMembers(opts => opts.Condition((src, dest, srcMember) => srcMember != null));
 
-        // ===== Category =====
+// Category
         CreateMap<CreateCategoryDto, Category>()
             .ForMember(dest => dest.Id, opt => opt.Ignore())
             .ForMember(dest => dest.CreatedAt, opt => opt.Ignore())
-            .ForMember(dest => dest.Documents, opt => opt.Ignore())
-            .ForMember(dest => dest.UpdatedAt, opt => opt.Ignore()); // нет в DTO
+            .ForMember(dest => dest.Documents, opt => opt.Ignore());
 
         CreateMap<UpdateCategoryDto, Category>()
             .ForMember(dest => dest.Id, opt => opt.Ignore())
             .ForMember(dest => dest.CreatedAt, opt => opt.Ignore())
             .ForMember(dest => dest.Documents, opt => opt.Ignore())
-            .ForMember(dest => dest.UpdatedAt, opt => opt.Ignore())
             .ForAllMembers(opts => opts.Condition((src, dest, srcMember) => srcMember != null));
 
         // ===== ArchiveLog =====
