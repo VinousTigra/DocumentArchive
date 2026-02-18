@@ -1,31 +1,27 @@
 using AutoMapper;
+using AutoMapper.QueryableExtensions;
 using DocumentArchive.Core.DTOs.ArchiveLog;
 using DocumentArchive.Core.DTOs.Shared;
-using DocumentArchive.Core.Interfaces.Repositorys;
 using DocumentArchive.Core.Interfaces.Services;
 using DocumentArchive.Core.Models;
+using DocumentArchive.Infrastructure.Data;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace DocumentArchive.Services.Services;
 
 public class ArchiveLogService : IArchiveLogService
 {
-    private readonly IArchiveLogRepository _logRepo;
-    private readonly IDocumentRepository _documentRepo;
-    private readonly IUserRepository _userRepo;
+    private readonly AppDbContext _context;
     private readonly IMapper _mapper;
     private readonly ILogger<ArchiveLogService> _logger;
 
     public ArchiveLogService(
-        IArchiveLogRepository logRepo,
-        IDocumentRepository documentRepo,
-        IUserRepository userRepo,
+        AppDbContext context,
         IMapper mapper,
         ILogger<ArchiveLogService> logger)
     {
-        _logRepo = logRepo;
-        _documentRepo = documentRepo;
-        _userRepo = userRepo;
+        _context = context;
         _mapper = mapper;
         _logger = logger;
     }
@@ -42,49 +38,88 @@ public class ArchiveLogService : IArchiveLogService
         CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Getting logs page {Page} size {PageSize}", page, pageSize);
-        var paged = await _logRepo.GetPagedAsync(page, pageSize, documentId, userId, fromDate, toDate, actionType, isCritical, cancellationToken);
-        var dtos = _mapper.Map<List<ArchiveLogListItemDto>>(paged.Items);
+
+        var query = _context.ArchiveLogs
+            .AsNoTracking()
+            .AsQueryable();
+
+        if (documentId.HasValue)
+            query = query.Where(l => l.DocumentId == documentId);
+        if (userId.HasValue)
+            query = query.Where(l => l.UserId == userId);
+        if (fromDate.HasValue)
+            query = query.Where(l => l.Timestamp >= fromDate.Value);
+        if (toDate.HasValue)
+            query = query.Where(l => l.Timestamp <= toDate.Value);
+        if (actionType.HasValue)
+            query = query.Where(l => l.ActionType == actionType.Value);
+        if (isCritical.HasValue)
+            query = query.Where(l => l.IsCritical == isCritical.Value);
+
+        // Сортировка по убыванию времени
+        query = query.OrderByDescending(l => l.Timestamp);
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var items = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ProjectTo<ArchiveLogListItemDto>(_mapper.ConfigurationProvider)
+            .ToListAsync(cancellationToken);
+
         return new PagedResult<ArchiveLogListItemDto>
         {
-            Items = dtos,
-            PageNumber = paged.PageNumber,
-            PageSize = paged.PageSize,
-            TotalCount = paged.TotalCount
+            Items = items,
+            PageNumber = page,
+            PageSize = pageSize,
+            TotalCount = totalCount
         };
     }
 
     public async Task<ArchiveLogResponseDto?> GetLogByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var log = await _logRepo.GetByIdAsync(id, cancellationToken);
+        var log = await _context.ArchiveLogs
+            .AsNoTracking()
+            .Include(l => l.User)
+            .Include(l => l.Document)
+            .FirstOrDefaultAsync(l => l.Id == id, cancellationToken);
+
         return log == null ? null : _mapper.Map<ArchiveLogResponseDto>(log);
     }
 
     public async Task<ArchiveLogResponseDto> CreateLogAsync(CreateArchiveLogDto createDto, CancellationToken cancellationToken = default)
     {
-        var document = await _documentRepo.GetByIdAsync(createDto.DocumentId, cancellationToken);
-        if (document == null)
+        // Проверка существования связанных сущностей
+        var documentExists = await _context.Documents
+            .AnyAsync(d => d.Id == createDto.DocumentId, cancellationToken);
+        if (!documentExists)
             throw new InvalidOperationException($"Document with id {createDto.DocumentId} not found");
 
-        var user = await _userRepo.GetByIdAsync(createDto.UserId, cancellationToken);
-        if (user == null)
+        var userExists = await _context.Users
+            .AnyAsync(u => u.Id == createDto.UserId, cancellationToken);
+        if (!userExists)
             throw new InvalidOperationException($"User with id {createDto.UserId} not found");
 
         var log = _mapper.Map<ArchiveLog>(createDto);
         log.Id = Guid.NewGuid();
         log.Timestamp = DateTime.UtcNow;
 
-        await _logRepo.AddAsync(log, cancellationToken);
+        _context.ArchiveLogs.Add(log);
+        await _context.SaveChangesAsync(cancellationToken);
+
         _logger.LogInformation("Log {LogId} created", log.Id);
         return _mapper.Map<ArchiveLogResponseDto>(log);
     }
 
     public async Task DeleteLogAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var existing = await _logRepo.GetByIdAsync(id, cancellationToken);
-        if (existing == null)
+        var log = await _context.ArchiveLogs
+            .FirstOrDefaultAsync(l => l.Id == id, cancellationToken);
+        if (log == null)
             throw new KeyNotFoundException($"Log with id {id} not found");
 
-        await _logRepo.DeleteAsync(id, cancellationToken);
+        _context.ArchiveLogs.Remove(log);
+        await _context.SaveChangesAsync(cancellationToken);
         _logger.LogInformation("Log {LogId} deleted", id);
     }
 }

@@ -1,29 +1,28 @@
 using AutoMapper;
+using AutoMapper.QueryableExtensions;
 using DocumentArchive.Core.DTOs.Document;
 using DocumentArchive.Core.DTOs.Shared;
 using DocumentArchive.Core.DTOs.User;
-using DocumentArchive.Core.Interfaces.Repositorys;
 using DocumentArchive.Core.Interfaces.Services;
 using DocumentArchive.Core.Models;
+using DocumentArchive.Infrastructure.Data;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace DocumentArchive.Services.Services;
 
 public class UserService : IUserService
 {
-    private readonly IUserRepository _userRepo;
-    private readonly IDocumentRepository _documentRepo;
+    private readonly AppDbContext _context;
     private readonly IMapper _mapper;
     private readonly ILogger<UserService> _logger;
 
     public UserService(
-        IUserRepository userRepo,
-        IDocumentRepository documentRepo,
+        AppDbContext context,
         IMapper mapper,
         ILogger<UserService> logger)
     {
-        _userRepo = userRepo;
-        _documentRepo = documentRepo;
+        _context = context;
         _mapper = mapper;
         _logger = logger;
     }
@@ -35,69 +34,124 @@ public class UserService : IUserService
         CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Getting users page {Page} size {PageSize}, search '{Search}'", page, pageSize, search);
-        var paged = await _userRepo.GetPagedAsync(page, pageSize, search, cancellationToken);
-        var dtos = _mapper.Map<List<UserListItemDto>>(paged.Items);
+
+        var query = _context.Users
+            .AsNoTracking()
+            .Where(u => !u.IsDeleted) // предположим, что мягко удалённых не показываем
+            .AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            query = query.Where(u => u.Username.Contains(search) ||
+                                     u.Email.Contains(search) ||
+                                     (u.FirstName != null && u.FirstName.Contains(search)) ||
+                                     (u.LastName != null && u.LastName.Contains(search)));
+        }
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var items = await query
+            .OrderBy(u => u.Username)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ProjectTo<UserListItemDto>(_mapper.ConfigurationProvider)
+            .ToListAsync(cancellationToken);
+
         return new PagedResult<UserListItemDto>
         {
-            Items = dtos,
-            PageNumber = paged.PageNumber,
-            PageSize = paged.PageSize,
-            TotalCount = paged.TotalCount
+            Items = items,
+            PageNumber = page,
+            PageSize = pageSize,
+            TotalCount = totalCount
         };
     }
 
     public async Task<UserResponseDto?> GetUserByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var user = await _userRepo.GetByIdAsync(id, cancellationToken);
+        var user = await _context.Users
+            .AsNoTracking()
+            .Include(u => u.UserRoles)
+                .ThenInclude(ur => ur.Role)
+            .FirstOrDefaultAsync(u => u.Id == id && !u.IsDeleted, cancellationToken);
+
         return user == null ? null : _mapper.Map<UserResponseDto>(user);
     }
 
     public async Task<UserResponseDto> CreateUserAsync(CreateUserDto createDto, CancellationToken cancellationToken = default)
     {
-        var existing = await _userRepo.FindByEmailAsync(createDto.Email, cancellationToken);
-        if (existing != null)
+        // Проверка уникальности email и username
+        var emailExists = await _context.Users
+            .AnyAsync(u => u.Email == createDto.Email, cancellationToken);
+        if (emailExists)
             throw new InvalidOperationException($"User with email '{createDto.Email}' already exists.");
+
+        var usernameExists = await _context.Users
+            .AnyAsync(u => u.Username == createDto.Username, cancellationToken);
+        if (usernameExists)
+            throw new InvalidOperationException($"User with username '{createDto.Username}' already exists.");
 
         var user = _mapper.Map<User>(createDto);
         user.Id = Guid.NewGuid();
         user.CreatedAt = DateTime.UtcNow;
+        user.IsActive = true;
+        user.IsDeleted = false;
 
-        await _userRepo.AddAsync(user, cancellationToken);
+        _context.Users.Add(user);
+        await _context.SaveChangesAsync(cancellationToken);
+
         _logger.LogInformation("User {UserId} created", user.Id);
         return _mapper.Map<UserResponseDto>(user);
     }
 
     public async Task UpdateUserAsync(Guid id, UpdateUserDto updateDto, CancellationToken cancellationToken = default)
     {
-        var existing = await _userRepo.GetByIdAsync(id, cancellationToken);
-        if (existing == null)
+        var user = await _context.Users
+            .FirstOrDefaultAsync(u => u.Id == id && !u.IsDeleted, cancellationToken);
+        if (user == null)
             throw new KeyNotFoundException($"User with id {id} not found");
 
-        if (updateDto.Email != null && updateDto.Email != existing.Email)
+        // Проверка уникальности email, если он меняется
+        if (!string.IsNullOrWhiteSpace(updateDto.Email) && updateDto.Email != user.Email)
         {
-            var emailExists = await _userRepo.FindByEmailAsync(updateDto.Email, cancellationToken);
-            if (emailExists != null)
+            var emailExists = await _context.Users
+                .AnyAsync(u => u.Email == updateDto.Email && u.Id != id, cancellationToken);
+            if (emailExists)
                 throw new InvalidOperationException($"User with email '{updateDto.Email}' already exists.");
         }
 
-        _mapper.Map(updateDto, existing);
-        existing.UpdatedAt = DateTime.UtcNow;
-        await _userRepo.UpdateAsync(existing, cancellationToken);
+        // Проверка уникальности username, если он меняется
+        if (!string.IsNullOrWhiteSpace(updateDto.Username) && updateDto.Username != user.Username)
+        {
+            var usernameExists = await _context.Users
+                .AnyAsync(u => u.Username == updateDto.Username && u.Id != id, cancellationToken);
+            if (usernameExists)
+                throw new InvalidOperationException($"User with username '{updateDto.Username}' already exists.");
+        }
+
+        _mapper.Map(updateDto, user);
+        user.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync(cancellationToken);
         _logger.LogInformation("User {UserId} updated", id);
     }
 
     public async Task DeleteUserAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var existing = await _userRepo.GetByIdAsync(id, cancellationToken);
-        if (existing == null)
+        var user = await _context.Users
+            .Include(u => u.Documents) // для проверки наличия документов
+            .FirstOrDefaultAsync(u => u.Id == id && !u.IsDeleted, cancellationToken);
+        if (user == null)
             throw new KeyNotFoundException($"User with id {id} not found");
 
-        var documents = await _documentRepo.GetByUserAsync(id, cancellationToken);
-        if (documents.Any())
+        if (user.Documents.Any())
             throw new InvalidOperationException("Cannot delete user with existing documents.");
 
-        await _userRepo.DeleteAsync(id, cancellationToken);
-        _logger.LogInformation("User {UserId} deleted", id);
+        // Soft delete или реальное удаление? По заданию в модели есть IsDeleted, делаем soft delete
+        user.IsDeleted = true;
+        user.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync(cancellationToken);
+        _logger.LogInformation("User {UserId} deleted (soft)", id);
     }
 
     public async Task<PagedResult<DocumentListItemDto>> GetUserDocumentsAsync(
@@ -106,23 +160,27 @@ public class UserService : IUserService
         int pageSize,
         CancellationToken cancellationToken = default)
     {
-        var user = await _userRepo.GetByIdAsync(userId, cancellationToken);
-        if (user == null)
+        var userExists = await _context.Users
+            .AnyAsync(u => u.Id == userId && !u.IsDeleted, cancellationToken);
+        if (!userExists)
             throw new KeyNotFoundException($"User with id {userId} not found");
 
-        var documents = await _documentRepo.GetByUserAsync(userId, cancellationToken);
-        var enumerable = documents as Document[] ?? documents.ToArray();
-        var totalCount = enumerable.Count();
-        var items = enumerable
-            .OrderBy(d => d.Title)
+        var query = _context.Documents
+            .AsNoTracking()
+            .Where(d => d.UserId == userId)
+            .OrderBy(d => d.Title);
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var items = await query
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .ToList();
+            .ProjectTo<DocumentListItemDto>(_mapper.ConfigurationProvider)
+            .ToListAsync(cancellationToken);
 
-        var dtos = _mapper.Map<List<DocumentListItemDto>>(items);
         return new PagedResult<DocumentListItemDto>
         {
-            Items = dtos,
+            Items = items,
             PageNumber = page,
             PageSize = pageSize,
             TotalCount = totalCount
