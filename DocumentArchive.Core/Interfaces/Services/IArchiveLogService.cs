@@ -1,5 +1,6 @@
 ﻿using DocumentArchive.Core.DTOs.ArchiveLog;
 using DocumentArchive.Core.DTOs.Shared;
+using DocumentArchive.Core.DTOs.Statistics;
 using DocumentArchive.Core.Models;
 
 namespace DocumentArchive.Core.Interfaces.Services;
@@ -20,4 +21,7 @@ public interface IArchiveLogService
     Task<ArchiveLogResponseDto?> GetLogByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<ArchiveLogResponseDto> CreateLogAsync(CreateArchiveLogDto createDto, CancellationToken cancellationToken = default);
     Task DeleteLogAsync(Guid id, CancellationToken cancellationToken = default);
+    
+    Task<Dictionary<ActionType, int>> GetLogsCountByActionTypeAsync(DateTime? fromDate = null, DateTime? toDate = null, CancellationToken cancellationToken = default);
+    Task<LogsStatisticsDto> GetLogsStatisticsAsync(DateTime? fromDate = null, DateTime? toDate = null, CancellationToken cancellationToken = default);
 }

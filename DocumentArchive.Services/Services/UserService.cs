@@ -2,6 +2,7 @@ using AutoMapper;
 using AutoMapper.QueryableExtensions;
 using DocumentArchive.Core.DTOs.Document;
 using DocumentArchive.Core.DTOs.Shared;
+using DocumentArchive.Core.DTOs.Statistics;
 using DocumentArchive.Core.DTOs.User;
 using DocumentArchive.Core.Interfaces.Services;
 using DocumentArchive.Core.Models;
@@ -184,6 +185,46 @@ public class UserService : IUserService
             PageNumber = page,
             PageSize = pageSize,
             TotalCount = totalCount
+        };
+    }
+    
+    public async Task<UserStatisticsDto> GetUserStatisticsAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        var user = await _context.Users
+            .Where(u => u.Id == userId && !u.IsDeleted)
+            .Select(u => new UserStatisticsDto
+            {
+                UserId = u.Id,
+                Username = u.Username,
+                Email = u.Email,
+                DocumentsCount = u.Documents.Count,
+                LastLoginAt = u.LastLoginAt,
+                RegisteredAt = u.CreatedAt
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (user == null)
+            throw new KeyNotFoundException($"User with id {userId} not found");
+
+        return user;
+    }
+
+    public async Task<UsersGeneralStatisticsDto> GetUsersGeneralStatisticsAsync(CancellationToken cancellationToken = default)
+    {
+        var totalUsers = await _context.Users.CountAsync(u => !u.IsDeleted, cancellationToken);
+        var activeToday = await _context.Users
+            .CountAsync(u => u.LastLoginAt >= DateTime.UtcNow.Date, cancellationToken);
+        var usersByDate = await _context.Users
+            .Where(u => !u.IsDeleted)
+            .GroupBy(u => u.CreatedAt.Date)
+            .Select(g => new DateCountDto { Date = g.Key, Count = g.Count() })
+            .ToListAsync(cancellationToken);
+
+        return new UsersGeneralStatisticsDto
+        {
+            TotalUsers = totalUsers,
+            ActiveToday = activeToday,
+            UsersByRegistrationDate = usersByDate
         };
     }
 }

@@ -1,6 +1,7 @@
 using DocumentArchive.Core.DTOs.Category;
 using DocumentArchive.Core.DTOs.Document;
 using DocumentArchive.Core.DTOs.Shared;
+using DocumentArchive.Core.DTOs.Statistics;
 
 namespace DocumentArchive.Core.Interfaces.Services;
 
@@ -19,12 +20,12 @@ public interface ICategoryService
     Task UpdateCategoryAsync(Guid id, UpdateCategoryDto updateDto, CancellationToken cancellationToken = default);
     Task DeleteCategoryAsync(Guid id, CancellationToken cancellationToken = default);
     
-    /// <summary>
-    /// Получает документы категории с пагинацией
-    /// </summary>
+
     Task<PagedResult<DocumentListItemDto>> GetCategoryDocumentsAsync(
         Guid categoryId,
         int page,
         int pageSize,
         CancellationToken cancellationToken = default);
+    
+    Task<List<CategoryWithDocumentCountDto>> GetCategoriesWithDocumentCountAsync(CancellationToken cancellationToken = default);
 }

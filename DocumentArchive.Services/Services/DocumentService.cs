@@ -3,6 +3,7 @@ using AutoMapper.QueryableExtensions;
 using DocumentArchive.Core.DTOs.ArchiveLog;
 using DocumentArchive.Core.DTOs.Document;
 using DocumentArchive.Core.DTOs.Shared;
+using DocumentArchive.Core.DTOs.Statistics;
 using DocumentArchive.Core.Interfaces.Services;
 using DocumentArchive.Core.Models;
 using DocumentArchive.Infrastructure.Data;
@@ -218,7 +219,6 @@ public class DocumentService : IDocumentService
         CancellationToken cancellationToken = default)
     {
         var result = new BulkOperationResult<Guid>();
-        // Используем транзакцию для атомарности всех операций
         await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
         try
         {
@@ -235,6 +235,7 @@ public class DocumentService : IDocumentService
                     result.Results.Add(new BulkOperationItem<Guid> { Success = false, Error = ex.Message });
                 }
             }
+            await _context.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
         }
         catch
@@ -376,5 +377,40 @@ public class DocumentService : IDocumentService
             throw;
         }
         return result;
+    }
+    
+    public async Task<Dictionary<string, int>> GetDocumentsCountByCategoryAsync(CancellationToken cancellationToken = default)
+    {
+        return await _context.Documents
+            .Where(d => d.CategoryId != null)
+            .GroupBy(d => d.Category!.Name)
+            .Select(g => new { CategoryName = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.CategoryName, x => x.Count, cancellationToken);
+    }
+
+    public async Task<DocumentsStatisticsDto> GetDocumentsStatisticsAsync(CancellationToken cancellationToken = default)
+    {
+        var totalCount = await _context.Documents.CountAsync(cancellationToken);
+        var categoriesCount = await _context.Documents
+            .Where(d => d.CategoryId != null)
+            .GroupBy(d => d.Category!.Name)
+            .Select(g => new CategoryCountDto { CategoryName = g.Key, Count = g.Count() })
+            .ToListAsync(cancellationToken);
+        var lastUploaded = await _context.Documents
+            .OrderByDescending(d => d.UploadDate)
+            .Select(d => new DocumentListItemDto
+            {
+                Id = d.Id,
+                Title = d.Title,
+                UploadDate = d.UploadDate
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return new DocumentsStatisticsDto
+        {
+            TotalDocuments = totalCount,
+            DocumentsPerCategory = categoriesCount,
+            LastUploadedDocument = lastUploaded
+        };
     }
 }

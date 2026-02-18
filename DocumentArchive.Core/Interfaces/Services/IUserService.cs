@@ -1,5 +1,6 @@
 using DocumentArchive.Core.DTOs.Document;
 using DocumentArchive.Core.DTOs.Shared;
+using DocumentArchive.Core.DTOs.Statistics;
 using DocumentArchive.Core.DTOs.User;
 
 namespace DocumentArchive.Core.Interfaces.Services;
@@ -17,12 +18,12 @@ public interface IUserService
     Task UpdateUserAsync(Guid id, UpdateUserDto updateDto, CancellationToken cancellationToken = default);
     Task DeleteUserAsync(Guid id, CancellationToken cancellationToken = default);
     
-    /// <summary>
-    /// Получает документы пользователя с пагинацией
-    /// </summary>
     Task<PagedResult<DocumentListItemDto>> GetUserDocumentsAsync(
         Guid userId,
         int page,
         int pageSize,
         CancellationToken cancellationToken = default);
+    
+    Task<UserStatisticsDto> GetUserStatisticsAsync(Guid userId, CancellationToken cancellationToken = default);
+    Task<UsersGeneralStatisticsDto> GetUsersGeneralStatisticsAsync(CancellationToken cancellationToken = default);
 }

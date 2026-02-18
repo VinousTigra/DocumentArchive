@@ -3,6 +3,7 @@ using AutoMapper.QueryableExtensions;
 using DocumentArchive.Core.DTOs.Category;
 using DocumentArchive.Core.DTOs.Document;
 using DocumentArchive.Core.DTOs.Shared;
+using DocumentArchive.Core.DTOs.Statistics;
 using DocumentArchive.Core.Interfaces.Services;
 using DocumentArchive.Core.Models;
 using DocumentArchive.Infrastructure.Data;
@@ -169,5 +170,18 @@ public class CategoryService : ICategoryService
             PageSize = pageSize,
             TotalCount = totalCount
         };
+    }
+    public async Task<List<CategoryWithDocumentCountDto>> GetCategoriesWithDocumentCountAsync(CancellationToken cancellationToken = default)
+    {
+        return await _context.Categories
+            .AsNoTracking()
+            .Select(c => new CategoryWithDocumentCountDto
+            {
+                Id = c.Id,
+                Name = c.Name,
+                Description = c.Description,
+                DocumentsCount = c.Documents.Count
+            })
+            .ToListAsync(cancellationToken);
     }
 }

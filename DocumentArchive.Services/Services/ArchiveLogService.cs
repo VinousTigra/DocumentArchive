@@ -2,6 +2,7 @@ using AutoMapper;
 using AutoMapper.QueryableExtensions;
 using DocumentArchive.Core.DTOs.ArchiveLog;
 using DocumentArchive.Core.DTOs.Shared;
+using DocumentArchive.Core.DTOs.Statistics;
 using DocumentArchive.Core.Interfaces.Services;
 using DocumentArchive.Core.Models;
 using DocumentArchive.Infrastructure.Data;
@@ -121,5 +122,44 @@ public class ArchiveLogService : IArchiveLogService
         _context.ArchiveLogs.Remove(log);
         await _context.SaveChangesAsync(cancellationToken);
         _logger.LogInformation("Log {LogId} deleted", id);
+    }
+    
+    public async Task<Dictionary<ActionType, int>> GetLogsCountByActionTypeAsync(DateTime? fromDate = null, DateTime? toDate = null, CancellationToken cancellationToken = default)
+    {
+        var query = _context.ArchiveLogs.AsNoTracking();
+
+        if (fromDate.HasValue)
+            query = query.Where(l => l.Timestamp >= fromDate.Value);
+        if (toDate.HasValue)
+            query = query.Where(l => l.Timestamp <= toDate.Value);
+
+        return await query
+            .GroupBy(l => l.ActionType)
+            .Select(g => new { ActionType = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.ActionType, x => x.Count, cancellationToken);
+    }
+
+    public async Task<LogsStatisticsDto> GetLogsStatisticsAsync(DateTime? fromDate = null, DateTime? toDate = null, CancellationToken cancellationToken = default)
+    {
+        var query = _context.ArchiveLogs.AsNoTracking();
+
+        if (fromDate.HasValue)
+            query = query.Where(l => l.Timestamp >= fromDate.Value);
+        if (toDate.HasValue)
+            query = query.Where(l => l.Timestamp <= toDate.Value);
+
+        var totalLogs = await query.CountAsync(cancellationToken);
+        var criticalLogs = await query.CountAsync(l => l.IsCritical, cancellationToken);
+        var logsByType = await query
+            .GroupBy(l => l.ActionType)
+            .Select(g => new ActionTypeCountDto { ActionType = g.Key, Count = g.Count() })
+            .ToListAsync(cancellationToken);
+
+        return new LogsStatisticsDto
+        {
+            TotalLogs = totalLogs,
+            CriticalLogs = criticalLogs,
+            LogsByActionType = logsByType
+        };
     }
 }

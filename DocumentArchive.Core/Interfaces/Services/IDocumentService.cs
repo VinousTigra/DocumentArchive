@@ -1,6 +1,7 @@
 ﻿using DocumentArchive.Core.DTOs.ArchiveLog;
 using DocumentArchive.Core.DTOs.Document;
 using DocumentArchive.Core.DTOs.Shared;
+using DocumentArchive.Core.DTOs.Statistics;
 
 namespace DocumentArchive.Core.Interfaces.Services;
 
@@ -39,4 +40,7 @@ public interface IDocumentService
     Task<BulkOperationResult<Guid>> DeleteBulkAsync(
         IEnumerable<Guid> ids,
         CancellationToken cancellationToken = default);
+    
+    Task<Dictionary<string, int>> GetDocumentsCountByCategoryAsync(CancellationToken cancellationToken = default);
+    Task<DocumentsStatisticsDto> GetDocumentsStatisticsAsync(CancellationToken cancellationToken = default);
 }
