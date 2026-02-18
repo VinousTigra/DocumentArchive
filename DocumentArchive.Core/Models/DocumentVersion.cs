@@ -8,8 +8,8 @@ public class DocumentVersion
 
     public int VersionNumber { get; set; }
     public string FileName { get; set; } = string.Empty;
-    public long FileSize { get; set; }          // в байтах
-    public string? Comment { get; set; }         // комментарий к версии
+    public long FileSize { get; set; } // размер в байтах
+    public string? Comment { get; set; }
     public DateTime UploadedAt { get; set; } = DateTime.UtcNow;
-    public Guid? UploadedBy { get; set; }        // ID пользователя, загрузившего версию
+    public Guid? UploadedBy { get; set; } // ID пользователя, загрузившего версию (опционально)
 }

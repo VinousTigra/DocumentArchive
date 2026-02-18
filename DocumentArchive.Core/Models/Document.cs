@@ -18,7 +18,7 @@ public class Document
 
     // Навигационные свойства для новых сущностей
     public ICollection<DocumentVersion> Versions { get; set; } = new List<DocumentVersion>();
-    public ICollection<ArchiveLog> Logs { get; set; } = new List<ArchiveLog>(); // если нужно
+    public ICollection<ArchiveLog> Logs { get; set; } = new List<ArchiveLog>(); // добавлено для связи с ArchiveLog
 
     // Бизнес-логика
     public bool CanBeDeleted() => (DateTime.UtcNow - UploadDate).TotalDays < 30;

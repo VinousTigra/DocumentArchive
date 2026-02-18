@@ -9,6 +9,7 @@ public class AppDbContext : DbContext
     {
     }
 
+    // DbSet для всех сущностей
     public DbSet<User> Users => Set<User>();
     public DbSet<Role> Roles => Set<Role>();
     public DbSet<Permission> Permissions => Set<Permission>();
@@ -21,53 +22,94 @@ public class AppDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        // Настройка User
+        // Настройка сущности User
         modelBuilder.Entity<User>(entity =>
         {
             entity.HasKey(u => u.Id);
-            entity.Property(u => u.Username).IsRequired().HasMaxLength(50);
-            entity.Property(u => u.Email).IsRequired().HasMaxLength(100);
-            entity.HasIndex(u => u.Email).IsUnique();
-            entity.HasIndex(u => u.Username).IsUnique();
-            entity.Property(u => u.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
-            // Для PostgreSQL можно использовать "NOW()"
+            entity.Property(u => u.Username)
+                .IsRequired()
+                .HasMaxLength(50);
+            entity.Property(u => u.Email)
+                .IsRequired()
+                .HasMaxLength(100);
+            entity.Property(u => u.FirstName)
+                .HasMaxLength(100);
+            entity.Property(u => u.LastName)
+                .HasMaxLength(100);
+            entity.Property(u => u.PhoneNumber)
+                .HasMaxLength(20);
+            entity.Property(u => u.PasswordHash)
+                .HasMaxLength(500); // для хеша может быть длинная строка
+            entity.Property(u => u.PasswordSalt)
+                .HasMaxLength(500);
+            entity.Property(u => u.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+            entity.Property(u => u.IsActive)
+                .HasDefaultValue(true);
+            entity.Property(u => u.IsDeleted)
+                .HasDefaultValue(false);
+
+            // Уникальные индексы
+            entity.HasIndex(u => u.Email)
+                .IsUnique();
+            entity.HasIndex(u => u.Username)
+                .IsUnique();
         });
 
-        // Настройка Role
+        // Настройка сущности Role
         modelBuilder.Entity<Role>(entity =>
         {
             entity.HasKey(r => r.Id);
-            entity.Property(r => r.Name).IsRequired().HasMaxLength(50);
-            entity.HasIndex(r => r.Name).IsUnique();
-            entity.Property(r => r.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+            entity.Property(r => r.Name)
+                .IsRequired()
+                .HasMaxLength(50);
+            entity.Property(r => r.Description)
+                .HasMaxLength(200);
+            entity.Property(r => r.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.HasIndex(r => r.Name)
+                .IsUnique();
         });
 
-        // Настройка Permission
+        // Настройка сущности Permission
         modelBuilder.Entity<Permission>(entity =>
         {
             entity.HasKey(p => p.Id);
-            entity.Property(p => p.Name).IsRequired().HasMaxLength(100);
-            entity.HasIndex(p => p.Name).IsUnique();
-            entity.Property(p => p.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+            entity.Property(p => p.Name)
+                .IsRequired()
+                .HasMaxLength(100);
+            entity.Property(p => p.Description)
+                .HasMaxLength(200);
+            entity.Property(p => p.Category)
+                .HasMaxLength(50);
+            entity.Property(p => p.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.HasIndex(p => p.Name)
+                .IsUnique();
         });
 
-        // Настройка UserRole (составной ключ)
+        // Настройка сущности UserRole (связь many-to-many между User и Role)
         modelBuilder.Entity<UserRole>(entity =>
         {
+            // Составной первичный ключ
             entity.HasKey(ur => new { ur.UserId, ur.RoleId });
 
+            // Связь с User
             entity.HasOne(ur => ur.User)
                 .WithMany(u => u.UserRoles)
                 .HasForeignKey(ur => ur.UserId)
                 .OnDelete(DeleteBehavior.Cascade); // При удалении пользователя удаляются его связи с ролями
 
+            // Связь с Role
             entity.HasOne(ur => ur.Role)
                 .WithMany(r => r.UserRoles)
                 .HasForeignKey(ur => ur.RoleId)
                 .OnDelete(DeleteBehavior.Cascade); // При удалении роли удаляются связи
         });
 
-        // Настройка RolePermission (составной ключ)
+        // Настройка сущности RolePermission (связь many-to-many между Role и Permission)
         modelBuilder.Entity<RolePermission>(entity =>
         {
             entity.HasKey(rp => new { rp.RoleId, rp.PermissionId });
@@ -83,79 +125,134 @@ public class AppDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        // Настройка Category
+        // Настройка сущности Category
         modelBuilder.Entity<Category>(entity =>
         {
             entity.HasKey(c => c.Id);
-            entity.Property(c => c.Name).IsRequired().HasMaxLength(100);
-            entity.HasIndex(c => c.Name).IsUnique();
-            entity.Property(c => c.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
-            // UpdatedAt может обновляться вручную, поэтому без дефолта
+            entity.Property(c => c.Name)
+                .IsRequired()
+                .HasMaxLength(100);
+            entity.Property(c => c.Description)
+                .HasMaxLength(500);
+            entity.Property(c => c.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+            // UpdatedAt не имеет дефолта, устанавливается вручную при обновлении
+
+            entity.HasIndex(c => c.Name)
+                .IsUnique();
         });
 
-        // Настройка Document
+        // Настройка сущности Document
         modelBuilder.Entity<Document>(entity =>
         {
             entity.HasKey(d => d.Id);
-            entity.Property(d => d.Title).IsRequired().HasMaxLength(200);
-            entity.Property(d => d.FileName).IsRequired().HasMaxLength(255);
-            entity.Property(d => d.UploadDate).HasDefaultValueSql("CURRENT_TIMESTAMP");
+            entity.Property(d => d.Title)
+                .IsRequired()
+                .HasMaxLength(200);
+            entity.Property(d => d.Description)
+                .HasMaxLength(1000);
+            entity.Property(d => d.FileName)
+                .IsRequired()
+                .HasMaxLength(255);
+            entity.Property(d => d.UploadDate)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+            // UpdatedAt без дефолта
 
-            // Связь с User
+            // Связь с User (многие к одному)
             entity.HasOne(d => d.User)
                 .WithMany(u => u.Documents)
                 .HasForeignKey(d => d.UserId)
-                .OnDelete(DeleteBehavior
-                    .SetNull); // При удалении пользователя документы остаются, но UserId становится null
+                .OnDelete(DeleteBehavior.SetNull); // Если пользователь удалён, документы остаются (UserId = null)
 
             // Связь с Category
             entity.HasOne(d => d.Category)
                 .WithMany(c => c.Documents)
                 .HasForeignKey(d => d.CategoryId)
-                .OnDelete(DeleteBehavior.Restrict); // Запрещаем удаление категории, если есть документы
+                .OnDelete(DeleteBehavior.Restrict); // Нельзя удалить категорию, если есть документы
         });
 
-        // Настройка DocumentVersion
+        // Настройка сущности DocumentVersion
         modelBuilder.Entity<DocumentVersion>(entity =>
         {
             entity.HasKey(dv => dv.Id);
-            entity.Property(dv => dv.FileName).IsRequired().HasMaxLength(255);
-            entity.Property(dv => dv.UploadedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
-            entity.Property(dv => dv.VersionNumber).IsRequired();
+            entity.Property(dv => dv.FileName)
+                .IsRequired()
+                .HasMaxLength(255);
+            entity.Property(dv => dv.VersionNumber)
+                .IsRequired();
+            entity.Property(dv => dv.Comment)
+                .HasMaxLength(500);
+            entity.Property(dv => dv.UploadedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+            // UploadedBy – может быть Guid?, без навигационного свойства, если не нужно
 
             // Связь с Document
             entity.HasOne(dv => dv.Document)
                 .WithMany(d => d.Versions)
                 .HasForeignKey(dv => dv.DocumentId)
                 .OnDelete(DeleteBehavior.Cascade); // При удалении документа удаляются все его версии
-
-            // Опционально: если хотите связать с пользователем, загрузившим версию
-            // entity.HasOne(dv => dv.UploadedByUser)... и т.д.
         });
 
-        // Настройка ArchiveLog
+        // Настройка сущности ArchiveLog
         modelBuilder.Entity<ArchiveLog>(entity =>
         {
             entity.HasKey(al => al.Id);
-            entity.Property(al => al.Action).IsRequired().HasMaxLength(50);
-            entity.Property(al => al.ActionType).HasConversion<int>(); // enum хранится как int
-            entity.Property(al => al.Timestamp).HasDefaultValueSql("CURRENT_TIMESTAMP");
+            entity.Property(al => al.Action)
+                .IsRequired()
+                .HasMaxLength(50);
+            // Преобразование enum ActionType в int
+            entity.Property(al => al.ActionType)
+                .HasConversion<int>();
+            entity.Property(al => al.IsCritical)
+                .IsRequired();
+            entity.Property(al => al.Timestamp)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
             // Связь с User
             entity.HasOne(al => al.User)
                 .WithMany(u => u.Logs)
                 .HasForeignKey(al => al.UserId)
-                .OnDelete(DeleteBehavior.SetNull); // При удалении пользователя логи остаются, но UserId = null
+                .OnDelete(DeleteBehavior.SetNull); // Если пользователь удалён, логи остаются (UserId = null)
 
             // Связь с Document
             entity.HasOne(al => al.Document)
-                .WithMany(d => d.Logs) // если добавили коллекцию Logs в Document
+                .WithMany(d => d.Logs) // Предполагается, что в Document есть коллекция Logs (добавьте, если нужно)
                 .HasForeignKey(al => al.DocumentId)
                 .OnDelete(DeleteBehavior.Cascade); // При удалении документа логи удаляются
         });
 
-        // Seed-данные (опционально, для начальных ролей)
-        // Можно добавить через HasData, но проще через миграции или отдельный скрипт.
+        // Seed-данные для ролей (начальные роли)
+        // Генерируем статические GUID, чтобы при каждой миграции они не менялись
+        var adminRoleId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+        var userRoleId = Guid.Parse("22222222-2222-2222-2222-222222222222");
+        var moderatorRoleId = Guid.Parse("33333333-3333-3333-3333-333333333333");
+
+        modelBuilder.Entity<Role>().HasData(
+            new Role
+            {
+                Id = adminRoleId,
+                Name = "Admin",
+                Description = "Administrator with full access",
+                CreatedAt = DateTime.UtcNow
+            },
+            new Role
+            {
+                Id = userRoleId,
+                Name = "User",
+                Description = "Regular user",
+                CreatedAt = DateTime.UtcNow
+            },
+            new Role
+            {
+                Id = moderatorRoleId,
+                Name = "Moderator",
+                Description = "Moderator with limited administrative rights",
+                CreatedAt = DateTime.UtcNow
+            }
+        );
+
+        // Примечание: Для реального проекта можно добавить seed-данные
+        // для администратора, но это уже позже.
 
         base.OnModelCreating(modelBuilder);
     }

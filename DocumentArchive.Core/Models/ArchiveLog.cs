@@ -16,10 +16,10 @@ public class ArchiveLog
     public ActionType ActionType { get; set; }
     public bool IsCritical { get; set; }
     public DateTime Timestamp { get; set; } = DateTime.UtcNow;
-    
+
     public Guid? UserId { get; set; }
     public User? User { get; set; }
-    
+
     public Guid? DocumentId { get; set; }
     public Document? Document { get; set; }
 }
