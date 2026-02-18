@@ -1,32 +1,70 @@
 using DocumentArchive.Core.DTOs.ArchiveLog;
-using DocumentArchive.Core.Interfaces.Repositorys;
 using DocumentArchive.Core.Models;
+using DocumentArchive.Infrastructure.Data;
 using DocumentArchive.Services.Validators;
-using FluentAssertions;
 using FluentValidation.TestHelper;
-using Moq;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 
 namespace DocumentArchive.Tests.ValidatorsTests;
 
-public class CreateArchiveLogDtoValidatorTests
+public class CreateArchiveLogDtoValidatorTests : IDisposable
 {
-    private readonly Mock<IDocumentRepository> _documentRepoMock;
-    private readonly Mock<IUserRepository> _userRepoMock;
+    private readonly SqliteConnection _connection;
+    private readonly AppDbContext _context;
     private readonly CreateArchiveLogDtoValidator _validator;
 
     public CreateArchiveLogDtoValidatorTests()
     {
-        _documentRepoMock = new Mock<IDocumentRepository>();
-        _userRepoMock = new Mock<IUserRepository>();
-        _validator = new CreateArchiveLogDtoValidator(
-            _documentRepoMock.Object,
-            _userRepoMock.Object);
+        _connection = new SqliteConnection("Filename=:memory:");
+        _connection.Open();
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseSqlite(_connection)
+            .Options;
+        _context = new AppDbContext(options);
+        _context.Database.EnsureCreated();
+
+        // Добавляем документ и пользователя для проверки существования
+        var user = new User { Id = Guid.NewGuid(), Username = "u", Email = "u@t.com" };
+        var doc = new Document { Id = Guid.NewGuid(), Title = "Doc", FileName = "f.pdf" };
+        _context.Users.Add(user);
+        _context.Documents.Add(doc);
+        _context.SaveChanges();
+
+        _validator = new CreateArchiveLogDtoValidator(_context);
+    }
+
+    public void Dispose()
+    {
+        _context.Dispose();
+        _connection.Close();
+        _connection.Dispose();
     }
 
     [Fact]
     public async Task Should_HaveError_When_Action_IsEmpty()
     {
-        var dto = new CreateArchiveLogDto { Action = "" };
+        var dto = new CreateArchiveLogDto
+        {
+            Action = "",
+            ActionType = ActionType.Created,
+            DocumentId = _context.Documents.First().Id,
+            UserId = _context.Users.First().Id
+        };
+        var result = await _validator.TestValidateAsync(dto);
+        result.ShouldHaveValidationErrorFor(x => x.Action);
+    }
+
+    [Fact]
+    public async Task Should_HaveError_When_Action_ExceedsMaxLength()
+    {
+        var dto = new CreateArchiveLogDto
+        {
+            Action = new string('a', 51),
+            ActionType = ActionType.Created,
+            DocumentId = _context.Documents.First().Id,
+            UserId = _context.Users.First().Id
+        };
         var result = await _validator.TestValidateAsync(dto);
         result.ShouldHaveValidationErrorFor(x => x.Action);
     }
@@ -34,7 +72,13 @@ public class CreateArchiveLogDtoValidatorTests
     [Fact]
     public async Task Should_HaveError_When_ActionType_IsInvalid()
     {
-        var dto = new CreateArchiveLogDto { Action = "Test", ActionType = (ActionType)999 };
+        var dto = new CreateArchiveLogDto
+        {
+            Action = "Test",
+            ActionType = (ActionType)999,
+            DocumentId = _context.Documents.First().Id,
+            UserId = _context.Users.First().Id
+        };
         var result = await _validator.TestValidateAsync(dto);
         result.ShouldHaveValidationErrorFor(x => x.ActionType);
     }
@@ -42,10 +86,13 @@ public class CreateArchiveLogDtoValidatorTests
     [Fact]
     public async Task Should_HaveError_When_DocumentId_DoesNotExist()
     {
-        var docId = Guid.NewGuid();
-        _documentRepoMock.Setup(x => x.GetByIdAsync(docId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((Document?)null);
-        var dto = new CreateArchiveLogDto { DocumentId = docId };
+        var dto = new CreateArchiveLogDto
+        {
+            Action = "Test",
+            ActionType = ActionType.Created,
+            DocumentId = Guid.NewGuid(),
+            UserId = _context.Users.First().Id
+        };
         var result = await _validator.TestValidateAsync(dto);
         result.ShouldHaveValidationErrorFor(x => x.DocumentId);
     }
@@ -53,17 +100,13 @@ public class CreateArchiveLogDtoValidatorTests
     [Fact]
     public async Task Should_NotHaveError_When_DocumentId_Exists()
     {
-        var docId = Guid.NewGuid();
-        _documentRepoMock.Setup(x => x.GetByIdAsync(docId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Document { Id = docId });
         var dto = new CreateArchiveLogDto
         {
             Action = "Test",
-            DocumentId = docId,
-            UserId = Guid.NewGuid()
+            ActionType = ActionType.Created,
+            DocumentId = _context.Documents.First().Id,
+            UserId = _context.Users.First().Id
         };
-        _userRepoMock.Setup(x => x.GetByIdAsync(dto.UserId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new User { Id = dto.UserId });
         var result = await _validator.TestValidateAsync(dto);
         result.ShouldNotHaveValidationErrorFor(x => x.DocumentId);
     }
@@ -71,11 +114,28 @@ public class CreateArchiveLogDtoValidatorTests
     [Fact]
     public async Task Should_HaveError_When_UserId_DoesNotExist()
     {
-        var userId = Guid.NewGuid();
-        _userRepoMock.Setup(x => x.GetByIdAsync(userId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((User?)null);
-        var dto = new CreateArchiveLogDto { UserId = userId };
+        var dto = new CreateArchiveLogDto
+        {
+            Action = "Test",
+            ActionType = ActionType.Created,
+            DocumentId = _context.Documents.First().Id,
+            UserId = Guid.NewGuid()
+        };
         var result = await _validator.TestValidateAsync(dto);
         result.ShouldHaveValidationErrorFor(x => x.UserId);
+    }
+
+    [Fact]
+    public async Task Should_NotHaveError_When_UserId_Exists()
+    {
+        var dto = new CreateArchiveLogDto
+        {
+            Action = "Test",
+            ActionType = ActionType.Created,
+            DocumentId = _context.Documents.First().Id,
+            UserId = _context.Users.First().Id
+        };
+        var result = await _validator.TestValidateAsync(dto);
+        result.ShouldNotHaveValidationErrorFor(x => x.UserId);
     }
 }

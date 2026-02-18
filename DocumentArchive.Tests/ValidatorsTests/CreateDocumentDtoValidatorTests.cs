@@ -1,26 +1,44 @@
 using DocumentArchive.Core.DTOs.Document;
-using DocumentArchive.Core.Interfaces.Repositorys;
 using DocumentArchive.Core.Models;
+using DocumentArchive.Infrastructure.Data;
 using DocumentArchive.Services.Validators;
-using FluentAssertions;
 using FluentValidation.TestHelper;
-using Moq;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 
 namespace DocumentArchive.Tests.ValidatorsTests;
 
-public class CreateDocumentDtoValidatorTests
+public class CreateDocumentDtoValidatorTests : IDisposable
 {
-    private readonly Mock<ICategoryRepository> _categoryRepoMock;
-    private readonly Mock<IUserRepository> _userRepoMock;
+    private readonly SqliteConnection _connection;
+    private readonly AppDbContext _context;
     private readonly CreateDocumentDtoValidator _validator;
 
     public CreateDocumentDtoValidatorTests()
     {
-        _categoryRepoMock = new Mock<ICategoryRepository>();
-        _userRepoMock = new Mock<IUserRepository>();
-        _validator = new CreateDocumentDtoValidator(
-            _categoryRepoMock.Object,
-            _userRepoMock.Object);
+        _connection = new SqliteConnection("Filename=:memory:");
+        _connection.Open();
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseSqlite(_connection)
+            .Options;
+        _context = new AppDbContext(options);
+        _context.Database.EnsureCreated();
+
+        // Заполняем тестовыми данными
+        var category = new Category { Id = Guid.NewGuid(), Name = "Test Category" };
+        var user = new User { Id = Guid.NewGuid(), Username = "testuser", Email = "test@test.com" };
+        _context.Categories.Add(category);
+        _context.Users.Add(user);
+        _context.SaveChanges();
+
+        _validator = new CreateDocumentDtoValidator(_context);
+    }
+
+    public void Dispose()
+    {
+        _context.Dispose();
+        _connection.Close();
+        _connection.Dispose();
     }
 
     [Fact]
@@ -58,14 +76,11 @@ public class CreateDocumentDtoValidatorTests
     [Fact]
     public async Task Should_HaveError_When_CategoryId_DoesNotExist()
     {
-        var categoryId = Guid.NewGuid();
-        _categoryRepoMock.Setup(x => x.GetByIdAsync(categoryId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((Category?)null);
         var dto = new CreateDocumentDto
         {
             Title = "Title",
             FileName = "test.pdf",
-            CategoryId = categoryId
+            CategoryId = Guid.NewGuid()
         };
         var result = await _validator.TestValidateAsync(dto);
         result.ShouldHaveValidationErrorFor(x => x.CategoryId);
@@ -74,14 +89,12 @@ public class CreateDocumentDtoValidatorTests
     [Fact]
     public async Task Should_NotHaveError_When_CategoryId_Exists()
     {
-        var categoryId = Guid.NewGuid();
-        _categoryRepoMock.Setup(x => x.GetByIdAsync(categoryId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new Category { Id = categoryId });
+        var existingCategoryId = _context.Categories.First().Id;
         var dto = new CreateDocumentDto
         {
             Title = "Title",
             FileName = "test.pdf",
-            CategoryId = categoryId
+            CategoryId = existingCategoryId
         };
         var result = await _validator.TestValidateAsync(dto);
         result.ShouldNotHaveValidationErrorFor(x => x.CategoryId);
@@ -90,14 +103,11 @@ public class CreateDocumentDtoValidatorTests
     [Fact]
     public async Task Should_HaveError_When_UserId_DoesNotExist()
     {
-        var userId = Guid.NewGuid();
-        _userRepoMock.Setup(x => x.GetByIdAsync(userId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((User?)null);
         var dto = new CreateDocumentDto
         {
             Title = "Title",
             FileName = "test.pdf",
-            UserId = userId
+            UserId = Guid.NewGuid()
         };
         var result = await _validator.TestValidateAsync(dto);
         result.ShouldHaveValidationErrorFor(x => x.UserId);
@@ -106,14 +116,12 @@ public class CreateDocumentDtoValidatorTests
     [Fact]
     public async Task Should_NotHaveError_When_UserId_Exists()
     {
-        var userId = Guid.NewGuid();
-        _userRepoMock.Setup(x => x.GetByIdAsync(userId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new User { Id = userId });
+        var existingUserId = _context.Users.First().Id;
         var dto = new CreateDocumentDto
         {
             Title = "Title",
             FileName = "test.pdf",
-            UserId = userId
+            UserId = existingUserId
         };
         var result = await _validator.TestValidateAsync(dto);
         result.ShouldNotHaveValidationErrorFor(x => x.UserId);
