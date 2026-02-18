@@ -3,12 +3,11 @@ using DocumentArchive.Core.DTOs.Category;
 using DocumentArchive.Core.Models;
 using DocumentArchive.Services.Mapping;
 using DocumentArchive.Services.Services;
-using DocumentArchive.Tests.ServicesTests;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 
-namespace DocumentArchive.Tests.Services;
+namespace DocumentArchive.Tests.ServicesTests;
 
 public class CategoryServiceTests : TestBase
 {

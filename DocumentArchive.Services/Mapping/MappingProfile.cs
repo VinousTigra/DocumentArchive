@@ -98,17 +98,23 @@ public class MappingProfile : Profile
         CreateMap<User, UserListItemDto>();
 
 
-// Category
+// ===== Category =====
         CreateMap<CreateCategoryDto, Category>()
             .ForMember(dest => dest.Id, opt => opt.Ignore())
             .ForMember(dest => dest.CreatedAt, opt => opt.Ignore())
+            .ForMember(dest => dest.UpdatedAt, opt => opt.Ignore()) // явно игнорируем
             .ForMember(dest => dest.Documents, opt => opt.Ignore());
 
         CreateMap<UpdateCategoryDto, Category>()
             .ForMember(dest => dest.Id, opt => opt.Ignore())
             .ForMember(dest => dest.CreatedAt, opt => opt.Ignore())
+            .ForMember(dest => dest.UpdatedAt, opt => opt.Ignore()) // добавлено
             .ForMember(dest => dest.Documents, opt => opt.Ignore())
             .ForAllMembers(opts => opts.Condition((src, dest, srcMember) => srcMember != null));
+
+// Маппинги из модели в DTO
+        CreateMap<Category, CategoryResponseDto>();
+        CreateMap<Category, CategoryListItemDto>();
 
         // ===== ArchiveLog =====
         CreateMap<CreateArchiveLogDto, ArchiveLog>()
