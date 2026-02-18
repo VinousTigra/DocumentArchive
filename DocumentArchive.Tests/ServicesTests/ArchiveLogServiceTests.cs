@@ -120,7 +120,7 @@ public class ArchiveLogServiceTests : TestBase
         // Arrange
         var user1 = new User { Id = Guid.NewGuid(), Username = "u1" };
         var user2 = new User { Id = Guid.NewGuid(), Username = "u2" };
-        var doc = new Document { Id = Guid.NewGuid(), Title = "Doc" };
+        var doc = new Document { Id = Guid.NewGuid(), Title = "Doc", FileName = "doc.pdf" };
         Context.Users.AddRange(user1, user2);
         Context.Documents.Add(doc);
         await Context.SaveChangesAsync();

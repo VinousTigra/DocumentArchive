@@ -126,6 +126,7 @@ public class DocumentServiceTests : TestBase
             FileName = "old.pdf",
             CategoryId = category.Id
         };
+        
         Context.Categories.Add(category);
         Context.Documents.Add(document);
         await Context.SaveChangesAsync();
