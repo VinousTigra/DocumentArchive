@@ -39,7 +39,7 @@ public class AppDbContext : DbContext
             entity.Property(u => u.PhoneNumber)
                 .HasMaxLength(20);
             entity.Property(u => u.PasswordHash)
-                .HasMaxLength(500); // для хеша может быть длинная строка
+                .HasMaxLength(500);
             entity.Property(u => u.PasswordSalt)
                 .HasMaxLength(500);
             entity.Property(u => u.CreatedAt)
@@ -49,11 +49,8 @@ public class AppDbContext : DbContext
             entity.Property(u => u.IsDeleted)
                 .HasDefaultValue(false);
 
-            // Уникальные индексы
-            entity.HasIndex(u => u.Email)
-                .IsUnique();
-            entity.HasIndex(u => u.Username)
-                .IsUnique();
+            entity.HasIndex(u => u.Email).IsUnique();
+            entity.HasIndex(u => u.Username).IsUnique();
         });
 
         // Настройка сущности Role
@@ -68,8 +65,7 @@ public class AppDbContext : DbContext
             entity.Property(r => r.CreatedAt)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-            entity.HasIndex(r => r.Name)
-                .IsUnique();
+            entity.HasIndex(r => r.Name).IsUnique();
         });
 
         // Настройка сущности Permission
@@ -86,27 +82,23 @@ public class AppDbContext : DbContext
             entity.Property(p => p.CreatedAt)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-            entity.HasIndex(p => p.Name)
-                .IsUnique();
+            entity.HasIndex(p => p.Name).IsUnique();
         });
 
         // Настройка сущности UserRole (связь many-to-many между User и Role)
         modelBuilder.Entity<UserRole>(entity =>
         {
-            // Составной первичный ключ
             entity.HasKey(ur => new { ur.UserId, ur.RoleId });
 
-            // Связь с User
             entity.HasOne(ur => ur.User)
                 .WithMany(u => u.UserRoles)
                 .HasForeignKey(ur => ur.UserId)
-                .OnDelete(DeleteBehavior.Cascade); // При удалении пользователя удаляются его связи с ролями
+                .OnDelete(DeleteBehavior.Cascade);
 
-            // Связь с Role
             entity.HasOne(ur => ur.Role)
                 .WithMany(r => r.UserRoles)
                 .HasForeignKey(ur => ur.RoleId)
-                .OnDelete(DeleteBehavior.Cascade); // При удалении роли удаляются связи
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         // Настройка сущности RolePermission (связь many-to-many между Role и Permission)
@@ -136,10 +128,8 @@ public class AppDbContext : DbContext
                 .HasMaxLength(500);
             entity.Property(c => c.CreatedAt)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP");
-            // UpdatedAt не имеет дефолта, устанавливается вручную при обновлении
 
-            entity.HasIndex(c => c.Name)
-                .IsUnique();
+            entity.HasIndex(c => c.Name).IsUnique();
         });
 
         // Настройка сущности Document
@@ -156,19 +146,16 @@ public class AppDbContext : DbContext
                 .HasMaxLength(255);
             entity.Property(d => d.UploadDate)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP");
-            // UpdatedAt без дефолта
 
-            // Связь с User (многие к одному)
             entity.HasOne(d => d.User)
                 .WithMany(u => u.Documents)
                 .HasForeignKey(d => d.UserId)
-                .OnDelete(DeleteBehavior.SetNull); // Если пользователь удалён, документы остаются (UserId = null)
+                .OnDelete(DeleteBehavior.SetNull);
 
-            // Связь с Category
             entity.HasOne(d => d.Category)
                 .WithMany(c => c.Documents)
                 .HasForeignKey(d => d.CategoryId)
-                .OnDelete(DeleteBehavior.Restrict); // Нельзя удалить категорию, если есть документы
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         // Настройка сущности DocumentVersion
@@ -184,13 +171,11 @@ public class AppDbContext : DbContext
                 .HasMaxLength(500);
             entity.Property(dv => dv.UploadedAt)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP");
-            // UploadedBy – может быть Guid?, без навигационного свойства, если не нужно
 
-            // Связь с Document
             entity.HasOne(dv => dv.Document)
                 .WithMany(d => d.Versions)
                 .HasForeignKey(dv => dv.DocumentId)
-                .OnDelete(DeleteBehavior.Cascade); // При удалении документа удаляются все его версии
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         // Настройка сущности ArchiveLog
@@ -200,7 +185,6 @@ public class AppDbContext : DbContext
             entity.Property(al => al.Action)
                 .IsRequired()
                 .HasMaxLength(50);
-            // Преобразование enum ActionType в int
             entity.Property(al => al.ActionType)
                 .HasConversion<int>();
             entity.Property(al => al.IsCritical)
@@ -208,24 +192,23 @@ public class AppDbContext : DbContext
             entity.Property(al => al.Timestamp)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-            // Связь с User
             entity.HasOne(al => al.User)
                 .WithMany(u => u.Logs)
                 .HasForeignKey(al => al.UserId)
-                .OnDelete(DeleteBehavior.SetNull); // Если пользователь удалён, логи остаются (UserId = null)
+                .OnDelete(DeleteBehavior.SetNull);
 
-            // Связь с Document
             entity.HasOne(al => al.Document)
-                .WithMany(d => d.Logs) // Предполагается, что в Document есть коллекция Logs (добавьте, если нужно)
+                .WithMany(d => d.Logs)
                 .HasForeignKey(al => al.DocumentId)
-                .OnDelete(DeleteBehavior.Cascade); // При удалении документа логи удаляются
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
-        // Seed-данные для ролей (начальные роли)
-        // Генерируем статические GUID, чтобы при каждой миграции они не менялись
+        // Seed-данные для ролей (используем статические GUID и фиксированную дату)
         var adminRoleId = Guid.Parse("11111111-1111-1111-1111-111111111111");
         var userRoleId = Guid.Parse("22222222-2222-2222-2222-222222222222");
         var moderatorRoleId = Guid.Parse("33333333-3333-3333-3333-333333333333");
+
+        var seedDate = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
         modelBuilder.Entity<Role>().HasData(
             new Role
@@ -233,26 +216,23 @@ public class AppDbContext : DbContext
                 Id = adminRoleId,
                 Name = "Admin",
                 Description = "Administrator with full access",
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = seedDate
             },
             new Role
             {
                 Id = userRoleId,
                 Name = "User",
                 Description = "Regular user",
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = seedDate
             },
             new Role
             {
                 Id = moderatorRoleId,
                 Name = "Moderator",
                 Description = "Moderator with limited administrative rights",
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = seedDate
             }
         );
-
-        // Примечание: Для реального проекта можно добавить seed-данные
-        // для администратора, но это уже позже.
 
         base.OnModelCreating(modelBuilder);
     }
