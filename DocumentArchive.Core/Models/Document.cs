@@ -9,13 +9,17 @@ public class Document
     public DateTime UploadDate { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
 
-    // Связи
+    // Внешние ключи
     public Guid? UserId { get; set; }
     public User? User { get; set; }
-    
+
     public Guid? CategoryId { get; set; }
     public Category? Category { get; set; }
 
-    // Бизнес-логика 
+    // Навигационные свойства для новых сущностей
+    public ICollection<DocumentVersion> Versions { get; set; } = new List<DocumentVersion>();
+    public ICollection<ArchiveLog> Logs { get; set; } = new List<ArchiveLog>(); // если нужно
+
+    // Бизнес-логика
     public bool CanBeDeleted() => (DateTime.UtcNow - UploadDate).TotalDays < 30;
 }
