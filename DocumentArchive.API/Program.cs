@@ -1,6 +1,5 @@
 using DocumentArchive.API.Middleware;
 using DocumentArchive.Infrastructure.Data;
-using DocumentArchive.Infrastructure.DependencyInjection;
 using DocumentArchive.Services.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
@@ -12,8 +11,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers()
     .AddJsonOptions(options => { options.JsonSerializerOptions.WriteIndented = true; });
 
-// Передаём конфигурацию в метод расширения Infrastructure 
-builder.Services.AddInfrastructure(builder.Configuration);
+// Передаём конфигурацию 
 builder.Services.AddServices();
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"),
