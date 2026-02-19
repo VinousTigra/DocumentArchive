@@ -16,7 +16,8 @@ builder.Services.AddControllers()
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddServices();
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"),
+        npgsqlOptions => npgsqlOptions.MigrationsAssembly("DocumentArchive.Infrastructure")));
 
 // Настройка OpenAPI (Scalar)
 builder.Services.AddOpenApi(options =>
