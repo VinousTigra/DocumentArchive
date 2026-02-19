@@ -2,6 +2,9 @@
 using DocumentArchive.Core.DTOs.ArchiveLog;
 using DocumentArchive.Core.DTOs.Category;
 using DocumentArchive.Core.DTOs.Document;
+using DocumentArchive.Core.DTOs.DocumentVersion;
+using DocumentArchive.Core.DTOs.Permission;
+using DocumentArchive.Core.DTOs.Role;
 using DocumentArchive.Core.DTOs.Statistics;
 using DocumentArchive.Core.DTOs.User;
 using DocumentArchive.Core.Models;
@@ -161,5 +164,57 @@ public class MappingProfile : Profile
             .ForMember(dest => dest.TotalLogs, opt => opt.Ignore())
             .ForMember(dest => dest.CriticalLogs, opt => opt.Ignore())
             .ForMember(dest => dest.LogsByActionType, opt => opt.Ignore());
+
+        // Role mappings
+        CreateMap<CreateRoleDto, Role>()
+            .ForMember(dest => dest.Id, opt => opt.Ignore())
+            .ForMember(dest => dest.CreatedAt, opt => opt.Ignore())
+            .ForMember(dest => dest.UserRoles, opt => opt.Ignore())
+            .ForMember(dest => dest.RolePermissions, opt => opt.Ignore());
+
+        CreateMap<UpdateRoleDto, Role>()
+            .ForMember(dest => dest.Id, opt => opt.Ignore())
+            .ForMember(dest => dest.CreatedAt, opt => opt.Ignore())
+            .ForMember(dest => dest.UserRoles, opt => opt.Ignore())
+            .ForMember(dest => dest.RolePermissions, opt => opt.Ignore())
+            .ForAllMembers(opts => opts.Condition((src, dest, srcMember) => srcMember != null));
+
+        CreateMap<Role, RoleResponseDto>();
+        CreateMap<Role, RoleListItemDto>();
+
+// Permission mappings
+        CreateMap<CreatePermissionDto, Permission>()
+            .ForMember(dest => dest.Id, opt => opt.Ignore())
+            .ForMember(dest => dest.CreatedAt, opt => opt.Ignore())
+            .ForMember(dest => dest.RolePermissions, opt => opt.Ignore());
+
+        CreateMap<UpdatePermissionDto, Permission>()
+            .ForMember(dest => dest.Id, opt => opt.Ignore())
+            .ForMember(dest => dest.CreatedAt, opt => opt.Ignore())
+            .ForMember(dest => dest.RolePermissions, opt => opt.Ignore())
+            .ForAllMembers(opts => opts.Condition((src, dest, srcMember) => srcMember != null));
+
+        CreateMap<Permission, PermissionResponseDto>();
+        CreateMap<Permission, PermissionListItemDto>();
+
+// DocumentVersion mappings
+        CreateMap<CreateDocumentVersionDto, DocumentVersion>()
+            .ForMember(dest => dest.Id, opt => opt.Ignore())
+            .ForMember(dest => dest.UploadedAt, opt => opt.Ignore())
+            .ForMember(dest => dest.Document, opt => opt.Ignore());
+
+        CreateMap<UpdateDocumentVersionDto, DocumentVersion>()
+            .ForMember(dest => dest.Id, opt => opt.Ignore())
+            .ForMember(dest => dest.DocumentId, opt => opt.Ignore())
+            .ForMember(dest => dest.VersionNumber, opt => opt.Ignore())
+            .ForMember(dest => dest.FileName, opt => opt.Ignore())
+            .ForMember(dest => dest.FileSize, opt => opt.Ignore())
+            .ForMember(dest => dest.UploadedAt, opt => opt.Ignore())
+            .ForMember(dest => dest.UploadedBy, opt => opt.Ignore())
+            .ForMember(dest => dest.Document, opt => opt.Ignore())
+            .ForAllMembers(opts => opts.Condition((src, dest, srcMember) => srcMember != null));
+
+        CreateMap<DocumentVersion, DocumentVersionResponseDto>();
+        CreateMap<DocumentVersion, DocumentVersionListItemDto>();
     }
 }
