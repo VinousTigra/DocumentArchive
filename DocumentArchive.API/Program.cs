@@ -26,9 +26,9 @@ builder.Services.AddOpenApi(options =>
     {
         document.Info = new OpenApiInfo
         {
-            Title = "Electronic Archive API",
+            Title = "Archive API",
             Version = "v1",
-            Description = "ASP.NET Core Web API для управления электронным архивом документов",
+            Description = "ASP.NET Core Web API для управления архивом документов",
             Contact = new OpenApiContact
             {
                 Name = "Student Name",
