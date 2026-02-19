@@ -1,6 +1,7 @@
 ﻿using DocumentArchive.Core.DTOs.Document;
 using DocumentArchive.Core.DTOs.Shared;
 using DocumentArchive.Core.DTOs.User;
+using DocumentArchive.Core.DTOs.Statistics; // для UserStatisticsDto, UsersGeneralStatisticsDto
 using DocumentArchive.Core.Interfaces.Services;
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
@@ -245,6 +246,53 @@ public class UsersController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting documents for user {UserId}", id);
+            return StatusCode(500,
+                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
+        }
+    }
+
+    /// <summary>
+    ///     Получает общую статистику по пользователям
+    /// </summary>
+    [HttpGet("statistics/general")]
+    [ProducesResponseType(typeof(UsersGeneralStatisticsDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<UsersGeneralStatisticsDto>> GetUsersGeneralStatistics(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _userService.GetUsersGeneralStatisticsAsync(cancellationToken);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting general users statistics");
+            return StatusCode(500,
+                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
+        }
+    }
+
+    /// <summary>
+    ///     Получает статистику конкретного пользователя
+    /// </summary>
+    [HttpGet("{id}/statistics")]
+    [ProducesResponseType(typeof(UserStatisticsDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<UserStatisticsDto>> GetUserStatistics(Guid id, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _userService.GetUserStatisticsAsync(id, cancellationToken);
+            return Ok(result);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting statistics for user {UserId}", id);
             return StatusCode(500,
                 new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
         }

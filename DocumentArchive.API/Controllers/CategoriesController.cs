@@ -1,6 +1,7 @@
 ﻿using DocumentArchive.Core.DTOs.Category;
 using DocumentArchive.Core.DTOs.Document;
 using DocumentArchive.Core.DTOs.Shared;
+using DocumentArchive.Core.DTOs.Statistics; // для CategoryWithDocumentCountDto
 using DocumentArchive.Core.Interfaces.Services;
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
@@ -252,6 +253,26 @@ public class CategoriesController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting documents for category {CategoryId}", id);
+            return StatusCode(500, new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
+        }
+    }
+
+    /// <summary>
+    /// Получает список категорий с количеством документов в каждой
+    /// </summary>
+    [HttpGet("with-document-count")]
+    [ProducesResponseType(typeof(List<CategoryWithDocumentCountDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<List<CategoryWithDocumentCountDto>>> GetCategoriesWithDocumentCount(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _categoryService.GetCategoriesWithDocumentCountAsync(cancellationToken);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting categories with document count");
             return StatusCode(500, new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
         }
     }

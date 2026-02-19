@@ -1,5 +1,6 @@
 ﻿using DocumentArchive.Core.DTOs.ArchiveLog;
 using DocumentArchive.Core.DTOs.Shared;
+using DocumentArchive.Core.DTOs.Statistics;
 using DocumentArchive.Core.Interfaces.Services;
 using DocumentArchive.Core.Models;
 using FluentValidation;
@@ -163,6 +164,54 @@ public class ArchiveLogsController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error deleting log {LogId}", id);
+            return StatusCode(500,
+                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
+        }
+    }
+
+    /// <summary>
+    ///     Получает количество логов по типам действий (статистика)
+    /// </summary>
+    [HttpGet("statistics/by-action-type")]
+    [ProducesResponseType(typeof(Dictionary<ActionType, int>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<Dictionary<ActionType, int>>> GetLogsCountByActionType(
+        [FromQuery] DateTime? fromDate = null,
+        [FromQuery] DateTime? toDate = null,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var result = await _logService.GetLogsCountByActionTypeAsync(fromDate, toDate, cancellationToken);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting logs count by action type");
+            return StatusCode(500,
+                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
+        }
+    }
+
+    /// <summary>
+    ///     Получает общую статистику по логам
+    /// </summary>
+    [HttpGet("statistics/summary")]
+    [ProducesResponseType(typeof(LogsStatisticsDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<LogsStatisticsDto>> GetLogsStatistics(
+        [FromQuery] DateTime? fromDate = null,
+        [FromQuery] DateTime? toDate = null,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var result = await _logService.GetLogsStatisticsAsync(fromDate, toDate, cancellationToken);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting logs statistics");
             return StatusCode(500,
                 new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
         }

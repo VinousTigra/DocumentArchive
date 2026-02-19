@@ -1,6 +1,7 @@
 ﻿using DocumentArchive.Core.DTOs.ArchiveLog;
 using DocumentArchive.Core.DTOs.Document;
 using DocumentArchive.Core.DTOs.Shared;
+using DocumentArchive.Core.DTOs.Statistics;
 using DocumentArchive.Core.Interfaces.Services;
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
@@ -273,8 +274,6 @@ public class DocumentsController : ControllerBase
         if (createDtos.Count > MaxBulkSize)
             return BadRequest($"Too many items in bulk request. Maximum allowed: {MaxBulkSize}.");
 
-        // Валидацию каждого DTO можно выполнить здесь, но для простоты пропустим (можно добавить позже)
-
         try
         {
             var result = await _documentService.CreateBulkAsync(createDtos, cancellationToken);
@@ -328,7 +327,7 @@ public class DocumentsController : ControllerBase
     /// <summary>
     /// Массовое удаление документов с детальным ответом
     /// </summary>
-    [HttpPost("bulk/delete")] // используем POST с телом для избежания длинного URL
+    [HttpPost("bulk/delete")]
     [ProducesResponseType(typeof(BulkOperationResult<Guid>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
@@ -354,6 +353,46 @@ public class DocumentsController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error in bulk delete");
+            return StatusCode(500, new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
+        }
+    }
+
+    /// <summary>
+    /// Получает количество документов по категориям (статистика)
+    /// </summary>
+    [HttpGet("statistics/by-category")]
+    [ProducesResponseType(typeof(Dictionary<string, int>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<Dictionary<string, int>>> GetDocumentsCountByCategory(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _documentService.GetDocumentsCountByCategoryAsync(cancellationToken);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting document counts by category");
+            return StatusCode(500, new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
+        }
+    }
+
+    /// <summary>
+    /// Получает общую статистику по документам
+    /// </summary>
+    [HttpGet("statistics/summary")]
+    [ProducesResponseType(typeof(DocumentsStatisticsDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<DocumentsStatisticsDto>> GetDocumentsStatistics(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await _documentService.GetDocumentsStatisticsAsync(cancellationToken);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting document statistics");
             return StatusCode(500, new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
         }
     }
