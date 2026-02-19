@@ -12,10 +12,10 @@ namespace DocumentArchive.API.Controllers;
 [Produces("application/json")]
 public class UsersController : ControllerBase
 {
-    private readonly IUserService _userService;
     private readonly IValidator<CreateUserDto> _createValidator;
-    private readonly IValidator<UpdateUserDto> _updateValidator;
     private readonly ILogger<UsersController> _logger;
+    private readonly IValidator<UpdateUserDto> _updateValidator;
+    private readonly IUserService _userService;
 
     public UsersController(
         IUserService userService,
@@ -30,7 +30,7 @@ public class UsersController : ControllerBase
     }
 
     /// <summary>
-    /// Получает список пользователей с пагинацией и поиском
+    ///     Получает список пользователей с пагинацией и поиском
     /// </summary>
     [HttpGet]
     [ProducesResponseType(typeof(PagedResult<UserListItemDto>), StatusCodes.Status200OK)]
@@ -60,12 +60,13 @@ public class UsersController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting users");
-            return StatusCode(500, new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
+            return StatusCode(500,
+                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
         }
     }
 
     /// <summary>
-    /// Получает пользователя по ID
+    ///     Получает пользователя по ID
     /// </summary>
     [HttpGet("{id}")]
     [ProducesResponseType(typeof(UserResponseDto), StatusCodes.Status200OK)]
@@ -89,24 +90,23 @@ public class UsersController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting user by ID {UserId}", id);
-            return StatusCode(500, new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
+            return StatusCode(500,
+                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
         }
     }
 
     /// <summary>
-    /// Создаёт нового пользователя
+    ///     Создаёт нового пользователя
     /// </summary>
     [HttpPost]
     [ProducesResponseType(typeof(UserResponseDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<UserResponseDto>> Create([FromBody] CreateUserDto createDto, CancellationToken cancellationToken = default)
+    public async Task<ActionResult<UserResponseDto>> Create([FromBody] CreateUserDto createDto,
+        CancellationToken cancellationToken = default)
     {
         var validationResult = await _createValidator.ValidateAsync(createDto, cancellationToken);
-        if (!validationResult.IsValid)
-        {
-            return BadRequest(validationResult.Errors);
-        }
+        if (!validationResult.IsValid) return BadRequest(validationResult.Errors);
 
         try
         {
@@ -116,7 +116,7 @@ public class UsersController : ControllerBase
         catch (InvalidOperationException ex)
         {
             _logger.LogWarning(ex, "Business rule violation in create user");
-            return BadRequest("Operation cannot be completed due to business rule violation.");
+            return BadRequest(ex.Message);
         }
         catch (OperationCanceledException)
         {
@@ -126,25 +126,24 @@ public class UsersController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error creating user");
-            return StatusCode(500, new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
+            return StatusCode(500,
+                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
         }
     }
 
     /// <summary>
-    /// Обновляет пользователя
+    ///     Обновляет пользователя
     /// </summary>
     [HttpPut("{id}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateUserDto updateDto, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateUserDto updateDto,
+        CancellationToken cancellationToken = default)
     {
         var validationResult = await _updateValidator.ValidateAsync(updateDto, cancellationToken);
-        if (!validationResult.IsValid)
-        {
-            return BadRequest(validationResult.Errors);
-        }
+        if (!validationResult.IsValid) return BadRequest(validationResult.Errors);
 
         try
         {
@@ -168,12 +167,13 @@ public class UsersController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error updating user {UserId}", id);
-            return StatusCode(500, new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
+            return StatusCode(500,
+                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
         }
     }
 
     /// <summary>
-    /// Удаляет пользователя
+    ///     Удаляет пользователя
     /// </summary>
     [HttpDelete("{id}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
@@ -204,12 +204,13 @@ public class UsersController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error deleting user {UserId}", id);
-            return StatusCode(500, new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
+            return StatusCode(500,
+                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
         }
     }
 
     /// <summary>
-    /// Получает документы пользователя с пагинацией
+    ///     Получает документы пользователя с пагинацией
     /// </summary>
     [HttpGet("{id}/documents")]
     [ProducesResponseType(typeof(PagedResult<DocumentListItemDto>), StatusCodes.Status200OK)]
@@ -244,7 +245,8 @@ public class UsersController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting documents for user {UserId}", id);
-            return StatusCode(500, new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
+            return StatusCode(500,
+                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
         }
     }
 }
