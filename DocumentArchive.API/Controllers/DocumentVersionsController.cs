@@ -1,9 +1,6 @@
-﻿using AutoMapper;
-using DocumentArchive.Core.DTOs.DocumentVersion;
-using DocumentArchive.Core.Models;
-using DocumentArchive.Infrastructure.Data;
+﻿using DocumentArchive.Core.DTOs.DocumentVersion;
+using DocumentArchive.Core.Interfaces.Services;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace DocumentArchive.API.Controllers;
 
@@ -12,14 +9,13 @@ namespace DocumentArchive.API.Controllers;
 [Produces("application/json")]
 public class DocumentVersionsController : ControllerBase
 {
-    private readonly AppDbContext _context;
+    private readonly IDocumentVersionService _documentVersionService;
     private readonly ILogger<DocumentVersionsController> _logger;
-    private readonly IMapper _mapper;
 
-    public DocumentVersionsController(AppDbContext context, IMapper mapper, ILogger<DocumentVersionsController> logger)
+    public DocumentVersionsController(IDocumentVersionService documentVersionService,
+        ILogger<DocumentVersionsController> logger)
     {
-        _context = context;
-        _mapper = mapper;
+        _documentVersionService = documentVersionService;
         _logger = logger;
     }
 
@@ -35,17 +31,8 @@ public class DocumentVersionsController : ControllerBase
     {
         try
         {
-            var query = _context.DocumentVersions
-                .AsNoTracking()
-                .AsQueryable();
-
-            if (documentId.HasValue)
-                query = query.Where(v => v.DocumentId == documentId.Value);
-
-            var versions = await query
-                .OrderByDescending(v => v.UploadedAt)
-                .ToListAsync(cancellationToken);
-            return Ok(_mapper.Map<List<DocumentVersionListItemDto>>(versions));
+            var versions = await _documentVersionService.GetAllAsync(documentId, cancellationToken);
+            return Ok(versions);
         }
         catch (OperationCanceledException)
         {
@@ -71,13 +58,10 @@ public class DocumentVersionsController : ControllerBase
     {
         try
         {
-            var version = await _context.DocumentVersions
-                .AsNoTracking()
-                .Include(v => v.Document)
-                .FirstOrDefaultAsync(v => v.Id == id, cancellationToken);
+            var version = await _documentVersionService.GetByIdAsync(id, cancellationToken);
             if (version == null)
                 return NotFound();
-            return Ok(_mapper.Map<DocumentVersionResponseDto>(version));
+            return Ok(version);
         }
         catch (OperationCanceledException)
         {
@@ -104,25 +88,13 @@ public class DocumentVersionsController : ControllerBase
     {
         try
         {
-            var documentExists = await _context.Documents.AnyAsync(d => d.Id == dto.DocumentId, cancellationToken);
-            if (!documentExists)
-                return BadRequest($"Document with id {dto.DocumentId} not found.");
-
-            var versionExists = await _context.DocumentVersions
-                .AnyAsync(v => v.DocumentId == dto.DocumentId && v.VersionNumber == dto.VersionNumber,
-                    cancellationToken);
-            if (versionExists)
-                return BadRequest($"Version number {dto.VersionNumber} already exists for this document.");
-
-            var version = _mapper.Map<DocumentVersion>(dto);
-            version.Id = Guid.NewGuid();
-            version.UploadedAt = DateTime.UtcNow;
-
-            _context.DocumentVersions.Add(version);
-            await _context.SaveChangesAsync(cancellationToken);
-
-            var response = _mapper.Map<DocumentVersionResponseDto>(version);
-            return CreatedAtAction(nameof(GetById), new { id = version.Id }, response);
+            var version = await _documentVersionService.CreateAsync(dto, cancellationToken);
+            return CreatedAtAction(nameof(GetById), new { id = version.Id }, version);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Business rule violation in create document version");
+            return BadRequest(ex.Message);
         }
         catch (OperationCanceledException)
         {
@@ -150,13 +122,12 @@ public class DocumentVersionsController : ControllerBase
     {
         try
         {
-            var version = await _context.DocumentVersions.FindAsync(new object[] { id }, cancellationToken);
-            if (version == null)
-                return NotFound();
-
-            _mapper.Map(dto, version);
-            await _context.SaveChangesAsync(cancellationToken);
+            await _documentVersionService.UpdateAsync(id, dto, cancellationToken);
             return NoContent();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
         }
         catch (OperationCanceledException)
         {
@@ -182,13 +153,12 @@ public class DocumentVersionsController : ControllerBase
     {
         try
         {
-            var version = await _context.DocumentVersions.FindAsync(new object[] { id }, cancellationToken);
-            if (version == null)
-                return NotFound();
-
-            _context.DocumentVersions.Remove(version);
-            await _context.SaveChangesAsync(cancellationToken);
+            await _documentVersionService.DeleteAsync(id, cancellationToken);
             return NoContent();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
         }
         catch (OperationCanceledException)
         {

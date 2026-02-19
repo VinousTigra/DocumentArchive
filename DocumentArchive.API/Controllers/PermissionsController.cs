@@ -1,9 +1,6 @@
-﻿using AutoMapper;
-using DocumentArchive.Core.DTOs.Permission;
-using DocumentArchive.Core.Models;
-using DocumentArchive.Infrastructure.Data;
+﻿using DocumentArchive.Core.DTOs.Permission;
+using DocumentArchive.Core.Interfaces.Services;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace DocumentArchive.API.Controllers;
 
@@ -12,14 +9,12 @@ namespace DocumentArchive.API.Controllers;
 [Produces("application/json")]
 public class PermissionsController : ControllerBase
 {
-    private readonly AppDbContext _context;
     private readonly ILogger<PermissionsController> _logger;
-    private readonly IMapper _mapper;
+    private readonly IPermissionService _permissionService;
 
-    public PermissionsController(AppDbContext context, IMapper mapper, ILogger<PermissionsController> logger)
+    public PermissionsController(IPermissionService permissionService, ILogger<PermissionsController> logger)
     {
-        _context = context;
-        _mapper = mapper;
+        _permissionService = permissionService;
         _logger = logger;
     }
 
@@ -33,11 +28,8 @@ public class PermissionsController : ControllerBase
     {
         try
         {
-            var permissions = await _context.Permissions
-                .AsNoTracking()
-                .OrderBy(p => p.Name)
-                .ToListAsync(cancellationToken);
-            return Ok(_mapper.Map<List<PermissionListItemDto>>(permissions));
+            var permissions = await _permissionService.GetAllAsync(cancellationToken);
+            return Ok(permissions);
         }
         catch (OperationCanceledException)
         {
@@ -63,12 +55,10 @@ public class PermissionsController : ControllerBase
     {
         try
         {
-            var permission = await _context.Permissions
-                .AsNoTracking()
-                .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
+            var permission = await _permissionService.GetByIdAsync(id, cancellationToken);
             if (permission == null)
                 return NotFound();
-            return Ok(_mapper.Map<PermissionResponseDto>(permission));
+            return Ok(permission);
         }
         catch (OperationCanceledException)
         {
@@ -95,19 +85,13 @@ public class PermissionsController : ControllerBase
     {
         try
         {
-            var exists = await _context.Permissions.AnyAsync(p => p.Name == dto.Name, cancellationToken);
-            if (exists)
-                return BadRequest($"Permission with name '{dto.Name}' already exists.");
-
-            var permission = _mapper.Map<Permission>(dto);
-            permission.Id = Guid.NewGuid();
-            permission.CreatedAt = DateTime.UtcNow;
-
-            _context.Permissions.Add(permission);
-            await _context.SaveChangesAsync(cancellationToken);
-
-            var response = _mapper.Map<PermissionResponseDto>(permission);
-            return CreatedAtAction(nameof(GetById), new { id = permission.Id }, response);
+            var permission = await _permissionService.CreateAsync(dto, cancellationToken);
+            return CreatedAtAction(nameof(GetById), new { id = permission.Id }, permission);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Business rule violation in create permission");
+            return BadRequest(ex.Message);
         }
         catch (OperationCanceledException)
         {
@@ -135,23 +119,17 @@ public class PermissionsController : ControllerBase
     {
         try
         {
-            var permission = await _context.Permissions.FindAsync(new object[] { id }, cancellationToken);
-            if (permission == null)
-                return NotFound();
-
-            if (!string.IsNullOrWhiteSpace(dto.Name) && dto.Name != permission.Name)
-            {
-                var exists =
-                    await _context.Permissions.AnyAsync(p => p.Name == dto.Name && p.Id != id, cancellationToken);
-                if (exists)
-                    return BadRequest($"Permission with name '{dto.Name}' already exists.");
-            }
-
-            _mapper.Map(dto, permission);
-            permission.UpdatedAt = DateTime.UtcNow;
-
-            await _context.SaveChangesAsync(cancellationToken);
+            await _permissionService.UpdateAsync(id, dto, cancellationToken);
             return NoContent();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Business rule violation in update permission");
+            return BadRequest(ex.Message);
         }
         catch (OperationCanceledException)
         {
@@ -178,18 +156,17 @@ public class PermissionsController : ControllerBase
     {
         try
         {
-            var permission = await _context.Permissions
-                .Include(p => p.RolePermissions)
-                .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
-            if (permission == null)
-                return NotFound();
-
-            if (permission.RolePermissions.Any())
-                return BadRequest("Cannot delete permission because it is assigned to roles.");
-
-            _context.Permissions.Remove(permission);
-            await _context.SaveChangesAsync(cancellationToken);
+            await _permissionService.DeleteAsync(id, cancellationToken);
             return NoContent();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "Business rule violation in delete permission");
+            return BadRequest(ex.Message);
         }
         catch (OperationCanceledException)
         {
