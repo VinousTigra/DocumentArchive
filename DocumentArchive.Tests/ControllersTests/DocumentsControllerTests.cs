@@ -1,15 +1,13 @@
-#nullable disable
 using DocumentArchive.API.Controllers;
 using DocumentArchive.Core.DTOs.ArchiveLog;
 using DocumentArchive.Core.DTOs.Document;
 using DocumentArchive.Core.DTOs.Shared;
+using DocumentArchive.Core.DTOs.Statistics;
 using DocumentArchive.Core.Interfaces.Services;
 using FluentAssertions;
 using FluentValidation;
 using FluentValidation.Results;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
 using Moq;
 
 namespace DocumentArchive.Tests.ControllersTests;
@@ -26,18 +24,11 @@ public class DocumentsControllerTests
         _documentServiceMock = new Mock<IDocumentService>();
         _createValidatorMock = new Mock<IValidator<CreateDocumentDto>>();
         _updateValidatorMock = new Mock<IValidator<UpdateDocumentDto>>();
-        var loggerMock = new Mock<ILogger<DocumentsController>>();
         _controller = new DocumentsController(
             _documentServiceMock.Object,
             _createValidatorMock.Object,
-            _updateValidatorMock.Object,
-            loggerMock.Object);
-        _controller.ControllerContext = new ControllerContext
-        {
-            HttpContext = new DefaultHttpContext()
-        };
+            _updateValidatorMock.Object);
     }
-    
 
     [Fact]
     public async Task GetAll_ShouldReturnOk_WhenParametersValid()
@@ -48,7 +39,6 @@ public class DocumentsControllerTests
             .ReturnsAsync(pagedResult);
 
         var result = await _controller.GetAll();
-
         var okResult = result.Result as OkObjectResult;
         okResult.Should().NotBeNull();
         okResult!.StatusCode.Should().Be(200);
@@ -100,36 +90,6 @@ public class DocumentsControllerTests
     }
 
     [Fact]
-    public async Task GetAll_ShouldReturn499_WhenOperationCanceled()
-    {
-        _documentServiceMock.Setup(x => x.GetDocumentsAsync(
-                1, 10, null, null, null, null, null, null, It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new OperationCanceledException());
-
-        var result = await _controller.GetAll();
-        var statusCodeResult = result.Result as ObjectResult;
-        statusCodeResult.Should().NotBeNull();
-        statusCodeResult!.StatusCode.Should().Be(499);
-        statusCodeResult.Value.Should().Be("Request cancelled");
-    }
-
-    [Fact]
-    public async Task GetAll_ShouldReturn500_WhenExceptionThrown()
-    {
-        _documentServiceMock.Setup(x => x.GetDocumentsAsync(
-                1, 10, null, null, null, null, null, null, It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new Exception("Test exception"));
-
-        var result = await _controller.GetAll();
-        var statusCodeResult = result.Result as ObjectResult;
-        statusCodeResult.Should().NotBeNull();
-        statusCodeResult!.StatusCode.Should().Be(500);
-        statusCodeResult.Value.Should().BeEquivalentTo(
-            new { error = "An internal error occurred." },
-            options => options.ExcludingMissingMembers());
-    }
-
-    [Fact]
     public async Task GetById_ShouldReturnOk_WhenDocumentExists()
     {
         var documentId = Guid.NewGuid();
@@ -149,7 +109,7 @@ public class DocumentsControllerTests
     {
         var documentId = Guid.NewGuid();
         _documentServiceMock.Setup(x => x.GetDocumentByIdAsync(documentId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((DocumentResponseDto)null);
+            .ReturnsAsync((DocumentResponseDto?)null);
 
         var result = await _controller.GetById(documentId);
         result.Result.Should().BeOfType<NotFoundResult>();
@@ -193,13 +153,12 @@ public class DocumentsControllerTests
         badRequest.Should().NotBeNull();
         badRequest!.StatusCode.Should().Be(400);
         var errors = badRequest.Value as IEnumerable<ValidationFailure>;
-        var enumerable = errors as ValidationFailure[] ?? errors.ToArray();
-        enumerable.Should().NotBeNull();
-        enumerable!.Select(e => e.ErrorMessage).Should().Contain(new[] { "Title is required", "File name is required" });
+        errors.Should().NotBeNull();
+        errors!.Select(e => e.ErrorMessage).Should().Contain(new[] { "Title is required", "File name is required" });
     }
 
     [Fact]
-    public async Task Create_ShouldReturnBadRequest_WhenInvalidOperationException()
+    public async Task Create_ShouldThrowInvalidOperationException_WhenServiceThrows()
     {
         var createDto = new CreateDocumentDto { Title = "Doc", FileName = "file.pdf" };
         var validationResult = new ValidationResult();
@@ -209,11 +168,7 @@ public class DocumentsControllerTests
         _documentServiceMock.Setup(x => x.CreateDocumentAsync(createDto, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("Business error"));
 
-        var result = await _controller.Create(createDto);
-        var badRequest = result.Result as BadRequestObjectResult;
-        badRequest.Should().NotBeNull();
-        badRequest!.StatusCode.Should().Be(400);
-        badRequest.Value.Should().Be("Operation cannot be completed due to business rule violation.");
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _controller.Create(createDto));
     }
 
     [Fact]
@@ -233,7 +188,7 @@ public class DocumentsControllerTests
     }
 
     [Fact]
-    public async Task Update_ShouldReturnNotFound_WhenKeyNotFoundException()
+    public async Task Update_ShouldThrowKeyNotFoundException_WhenServiceThrows()
     {
         var id = Guid.NewGuid();
         var updateDto = new UpdateDocumentDto { Title = "Updated" };
@@ -244,8 +199,7 @@ public class DocumentsControllerTests
         _documentServiceMock.Setup(x => x.UpdateDocumentAsync(id, updateDto, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new KeyNotFoundException());
 
-        var result = await _controller.Update(id, updateDto);
-        result.Should().BeOfType<NotFoundResult>();
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => _controller.Update(id, updateDto));
     }
 
     [Fact]
@@ -260,14 +214,13 @@ public class DocumentsControllerTests
     }
 
     [Fact]
-    public async Task Delete_ShouldReturnNotFound_WhenKeyNotFoundException()
+    public async Task Delete_ShouldThrowKeyNotFoundException_WhenServiceThrows()
     {
         var id = Guid.NewGuid();
         _documentServiceMock.Setup(x => x.DeleteDocumentAsync(id, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new KeyNotFoundException());
 
-        var result = await _controller.Delete(id);
-        result.Should().BeOfType<NotFoundResult>();
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => _controller.Delete(id));
     }
 
     [Fact]
@@ -286,14 +239,13 @@ public class DocumentsControllerTests
     }
 
     [Fact]
-    public async Task GetDocumentLogs_ShouldReturnNotFound_WhenDocumentDoesNotExist()
+    public async Task GetDocumentLogs_ShouldThrowKeyNotFoundException_WhenDocumentDoesNotExist()
     {
         var id = Guid.NewGuid();
         _documentServiceMock.Setup(x => x.GetDocumentLogsAsync(id, 1, 20, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new KeyNotFoundException());
 
-        var result = await _controller.GetDocumentLogs(id);
-        result.Result.Should().BeOfType<NotFoundResult>();
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => _controller.GetDocumentLogs(id));
     }
 
     [Fact]
@@ -363,5 +315,31 @@ public class DocumentsControllerTests
         okResult.Should().NotBeNull();
         okResult!.StatusCode.Should().Be(200);
         okResult.Value.Should().Be(bulkResult);
+    }
+
+    [Fact]
+    public async Task GetDocumentsCountByCategory_ShouldReturnOk()
+    {
+        var dict = new Dictionary<string, int> { { "Cat", 5 } };
+        _documentServiceMock.Setup(x => x.GetDocumentsCountByCategoryAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(dict);
+
+        var result = await _controller.GetDocumentsCountByCategory(default);
+        var okResult = result.Result as OkObjectResult;
+        okResult.Should().NotBeNull();
+        okResult!.Value.Should().Be(dict);
+    }
+
+    [Fact]
+    public async Task GetDocumentsStatistics_ShouldReturnOk()
+    {
+        var stats = new DocumentsStatisticsDto();
+        _documentServiceMock.Setup(x => x.GetDocumentsStatisticsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(stats);
+
+        var result = await _controller.GetDocumentsStatistics(default);
+        var okResult = result.Result as OkObjectResult;
+        okResult.Should().NotBeNull();
+        okResult!.Value.Should().Be(stats);
     }
 }

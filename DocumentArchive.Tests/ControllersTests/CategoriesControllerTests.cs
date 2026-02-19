@@ -2,12 +2,12 @@ using DocumentArchive.API.Controllers;
 using DocumentArchive.Core.DTOs.Category;
 using DocumentArchive.Core.DTOs.Document;
 using DocumentArchive.Core.DTOs.Shared;
+using DocumentArchive.Core.DTOs.Statistics;
 using DocumentArchive.Core.Interfaces.Services;
 using FluentAssertions;
 using FluentValidation;
 using FluentValidation.Results;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
 using Moq;
 
 namespace DocumentArchive.Tests.ControllersTests;
@@ -15,22 +15,19 @@ namespace DocumentArchive.Tests.ControllersTests;
 public class CategoriesControllerTests
 {
     private readonly Mock<ICategoryService> _categoryServiceMock;
+    private readonly CategoriesController _controller;
     private readonly Mock<IValidator<CreateCategoryDto>> _createValidatorMock;
     private readonly Mock<IValidator<UpdateCategoryDto>> _updateValidatorMock;
-    private readonly Mock<ILogger<CategoriesController>> _loggerMock;
-    private readonly CategoriesController _controller;
 
     public CategoriesControllerTests()
     {
         _categoryServiceMock = new Mock<ICategoryService>();
         _createValidatorMock = new Mock<IValidator<CreateCategoryDto>>();
         _updateValidatorMock = new Mock<IValidator<UpdateCategoryDto>>();
-        _loggerMock = new Mock<ILogger<CategoriesController>>();
         _controller = new CategoriesController(
             _categoryServiceMock.Object,
             _createValidatorMock.Object,
-            _updateValidatorMock.Object,
-            _loggerMock.Object);
+            _updateValidatorMock.Object);
     }
 
     [Fact]
@@ -51,7 +48,7 @@ public class CategoriesControllerTests
     [Fact]
     public async Task GetAll_ShouldReturnBadRequest_WhenPageLessThan1()
     {
-        var result = await _controller.GetAll(page: 0);
+        var result = await _controller.GetAll(0);
         var badRequest = result.Result as BadRequestObjectResult;
         badRequest.Should().NotBeNull();
         badRequest!.StatusCode.Should().Be(400);
@@ -138,10 +135,7 @@ public class CategoriesControllerTests
     public async Task Create_ShouldReturnBadRequest_WhenValidationFails()
     {
         var createDto = new CreateCategoryDto { Name = "" };
-        var validationFailures = new List<ValidationFailure>
-        {
-            new("Name", "Name is required")
-        };
+        var validationFailures = new List<ValidationFailure> { new("Name", "Name is required") };
         var validationResult = new ValidationResult(validationFailures);
         _createValidatorMock.Setup(x => x.ValidateAsync(createDto, It.IsAny<CancellationToken>()))
             .ReturnsAsync(validationResult);
@@ -151,12 +145,13 @@ public class CategoriesControllerTests
         badRequest.Should().NotBeNull();
         badRequest!.StatusCode.Should().Be(400);
         var errors = badRequest.Value as IEnumerable<ValidationFailure>;
-        errors.Should().NotBeNull();
-        errors!.Select(e => e.ErrorMessage).Should().Contain(new[] { "Name is required" });
+        var enumerable = errors as ValidationFailure[] ?? errors.ToArray();
+        enumerable.Should().NotBeNull();
+        enumerable!.Select(e => e.ErrorMessage).Should().Contain(new[] { "Name is required" });
     }
 
     [Fact]
-    public async Task Create_ShouldReturnBadRequest_WhenInvalidOperationException()
+    public async Task Create_ShouldThrowInvalidOperationException_WhenServiceThrows()
     {
         var createDto = new CreateCategoryDto { Name = "ExistingCat" };
         var validationResult = new ValidationResult();
@@ -166,11 +161,7 @@ public class CategoriesControllerTests
         _categoryServiceMock.Setup(x => x.CreateCategoryAsync(createDto, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("Category with name already exists."));
 
-        var result = await _controller.Create(createDto);
-        var badRequest = result.Result as BadRequestObjectResult;
-        badRequest.Should().NotBeNull();
-        badRequest!.StatusCode.Should().Be(400);
-        badRequest.Value.Should().Be("Operation cannot be completed due to business rule violation.");
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _controller.Create(createDto));
     }
 
     [Fact]
@@ -190,7 +181,7 @@ public class CategoriesControllerTests
     }
 
     [Fact]
-    public async Task Update_ShouldReturnNotFound_WhenKeyNotFoundException()
+    public async Task Update_ShouldThrowKeyNotFoundException_WhenServiceThrows()
     {
         var id = Guid.NewGuid();
         var updateDto = new UpdateCategoryDto { Name = "Updated" };
@@ -201,8 +192,7 @@ public class CategoriesControllerTests
         _categoryServiceMock.Setup(x => x.UpdateCategoryAsync(id, updateDto, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new KeyNotFoundException());
 
-        var result = await _controller.Update(id, updateDto);
-        result.Should().BeOfType<NotFoundResult>();
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => _controller.Update(id, updateDto));
     }
 
     [Fact]
@@ -217,28 +207,13 @@ public class CategoriesControllerTests
     }
 
     [Fact]
-    public async Task Delete_ShouldReturnNotFound_WhenKeyNotFoundException()
+    public async Task Delete_ShouldThrowKeyNotFoundException_WhenServiceThrows()
     {
         var id = Guid.NewGuid();
         _categoryServiceMock.Setup(x => x.DeleteCategoryAsync(id, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new KeyNotFoundException());
 
-        var result = await _controller.Delete(id);
-        result.Should().BeOfType<NotFoundResult>();
-    }
-
-    [Fact]
-    public async Task Delete_ShouldReturnBadRequest_WhenInvalidOperationException()
-    {
-        var id = Guid.NewGuid();
-        _categoryServiceMock.Setup(x => x.DeleteCategoryAsync(id, It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new InvalidOperationException("Cannot delete category with documents."));
-
-        var result = await _controller.Delete(id);
-        var badRequest = result as BadRequestObjectResult;
-        badRequest.Should().NotBeNull();
-        badRequest!.StatusCode.Should().Be(400);
-        badRequest.Value.Should().Be("Operation cannot be completed due to business rule violation.");
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => _controller.Delete(id));
     }
 
     [Fact]
@@ -257,23 +232,35 @@ public class CategoriesControllerTests
     }
 
     [Fact]
-    public async Task GetDocumentsByCategory_ShouldReturnNotFound_WhenCategoryDoesNotExist()
+    public async Task GetDocumentsByCategory_ShouldThrowKeyNotFoundException_WhenCategoryDoesNotExist()
     {
         var categoryId = Guid.NewGuid();
         _categoryServiceMock.Setup(x => x.GetCategoryDocumentsAsync(categoryId, 1, 10, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new KeyNotFoundException());
 
-        var result = await _controller.GetDocumentsByCategory(categoryId);
-        result.Result.Should().BeOfType<NotFoundResult>();
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => _controller.GetDocumentsByCategory(categoryId));
     }
 
     [Fact]
     public async Task GetDocumentsByCategory_ShouldReturnBadRequest_WhenPageInvalid()
     {
-        var result = await _controller.GetDocumentsByCategory(Guid.NewGuid(), page: 0);
+        var result = await _controller.GetDocumentsByCategory(Guid.NewGuid(), 0);
         var badRequest = result.Result as BadRequestObjectResult;
         badRequest.Should().NotBeNull();
         badRequest!.StatusCode.Should().Be(400);
         badRequest.Value.Should().Be("Page must be >= 1.");
+    }
+
+    [Fact]
+    public async Task GetCategoriesWithDocumentCount_ShouldReturnOk()
+    {
+        var list = new List<CategoryWithDocumentCountDto>();
+        _categoryServiceMock.Setup(x => x.GetCategoriesWithDocumentCountAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(list);
+
+        var result = await _controller.GetCategoriesWithDocumentCount(default);
+        var okResult = result.Result as OkObjectResult;
+        okResult.Should().NotBeNull();
+        okResult!.Value.Should().Be(list);
     }
 }

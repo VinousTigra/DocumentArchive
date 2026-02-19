@@ -1,14 +1,13 @@
-#nullable disable
 using DocumentArchive.API.Controllers;
 using DocumentArchive.Core.DTOs.Document;
 using DocumentArchive.Core.DTOs.Shared;
+using DocumentArchive.Core.DTOs.Statistics;
 using DocumentArchive.Core.DTOs.User;
 using DocumentArchive.Core.Interfaces.Services;
 using FluentAssertions;
 using FluentValidation;
 using FluentValidation.Results;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
 using Moq;
 
 namespace DocumentArchive.Tests.ControllersTests;
@@ -25,12 +24,10 @@ public class UsersControllerTests
         _userServiceMock = new Mock<IUserService>();
         _createValidatorMock = new Mock<IValidator<CreateUserDto>>();
         _updateValidatorMock = new Mock<IValidator<UpdateUserDto>>();
-        var loggerMock = new Mock<ILogger<UsersController>>();
         _controller = new UsersController(
             _userServiceMock.Object,
             _createValidatorMock.Object,
-            _updateValidatorMock.Object,
-            loggerMock.Object);
+            _updateValidatorMock.Object);
     }
 
     [Fact]
@@ -87,7 +84,7 @@ public class UsersControllerTests
     {
         var userId = Guid.NewGuid();
         _userServiceMock.Setup(x => x.GetUserByIdAsync(userId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((UserResponseDto)null);
+            .ReturnsAsync((UserResponseDto?)null);
 
         var result = await _controller.GetById(userId);
         result.Result.Should().BeOfType<NotFoundResult>();
@@ -131,14 +128,12 @@ public class UsersControllerTests
         badRequest.Should().NotBeNull();
         badRequest!.StatusCode.Should().Be(400);
         var errors = badRequest.Value as IEnumerable<ValidationFailure>;
-        var enumerable = errors as ValidationFailure[] ?? errors.ToArray();
-        enumerable.Should().NotBeNull();
-        enumerable!.Select(e => e.ErrorMessage).Should()
-            .Contain(new[] { "Username is required", "Invalid email format" });
+        errors.Should().NotBeNull();
+        errors!.Select(e => e.ErrorMessage).Should().Contain(new[] { "Username is required", "Invalid email format" });
     }
 
     [Fact]
-    public async Task Create_ShouldReturnBadRequest_WhenInvalidOperationException()
+    public async Task Create_ShouldThrowInvalidOperationException_WhenServiceThrows()
     {
         var createDto = new CreateUserDto { Username = "user", Email = "exists@test.com" };
         var validationResult = new ValidationResult();
@@ -148,11 +143,7 @@ public class UsersControllerTests
         _userServiceMock.Setup(x => x.CreateUserAsync(createDto, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("User with email already exists."));
 
-        var result = await _controller.Create(createDto);
-        var badRequest = result.Result as BadRequestObjectResult;
-        badRequest.Should().NotBeNull();
-        badRequest!.StatusCode.Should().Be(400);
-        badRequest.Value.Should().Be("Operation cannot be completed due to business rule violation.");
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _controller.Create(createDto));
     }
 
     [Fact]
@@ -172,7 +163,7 @@ public class UsersControllerTests
     }
 
     [Fact]
-    public async Task Update_ShouldReturnNotFound_WhenKeyNotFoundException()
+    public async Task Update_ShouldThrowKeyNotFoundException_WhenServiceThrows()
     {
         var id = Guid.NewGuid();
         var updateDto = new UpdateUserDto { Username = "updated" };
@@ -183,8 +174,7 @@ public class UsersControllerTests
         _userServiceMock.Setup(x => x.UpdateUserAsync(id, updateDto, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new KeyNotFoundException());
 
-        var result = await _controller.Update(id, updateDto);
-        result.Should().BeOfType<NotFoundResult>();
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => _controller.Update(id, updateDto));
     }
 
     [Fact]
@@ -199,28 +189,13 @@ public class UsersControllerTests
     }
 
     [Fact]
-    public async Task Delete_ShouldReturnNotFound_WhenKeyNotFoundException()
+    public async Task Delete_ShouldThrowKeyNotFoundException_WhenServiceThrows()
     {
         var id = Guid.NewGuid();
         _userServiceMock.Setup(x => x.DeleteUserAsync(id, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new KeyNotFoundException());
 
-        var result = await _controller.Delete(id);
-        result.Should().BeOfType<NotFoundResult>();
-    }
-
-    [Fact]
-    public async Task Delete_ShouldReturnBadRequest_WhenInvalidOperationException()
-    {
-        var id = Guid.NewGuid();
-        _userServiceMock.Setup(x => x.DeleteUserAsync(id, It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new InvalidOperationException("Cannot delete user with documents."));
-
-        var result = await _controller.Delete(id);
-        var badRequest = result as BadRequestObjectResult;
-        badRequest.Should().NotBeNull();
-        badRequest!.StatusCode.Should().Be(400);
-        badRequest.Value.Should().Be("Operation cannot be completed due to business rule violation.");
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => _controller.Delete(id));
     }
 
     [Fact]
@@ -239,14 +214,13 @@ public class UsersControllerTests
     }
 
     [Fact]
-    public async Task GetUserDocuments_ShouldReturnNotFound_WhenUserDoesNotExist()
+    public async Task GetUserDocuments_ShouldThrowKeyNotFoundException_WhenUserDoesNotExist()
     {
         var userId = Guid.NewGuid();
         _userServiceMock.Setup(x => x.GetUserDocumentsAsync(userId, 1, 10, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new KeyNotFoundException());
 
-        var result = await _controller.GetUserDocuments(userId);
-        result.Result.Should().BeOfType<NotFoundResult>();
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => _controller.GetUserDocuments(userId));
     }
 
     [Fact]
@@ -257,5 +231,88 @@ public class UsersControllerTests
         badRequest.Should().NotBeNull();
         badRequest!.StatusCode.Should().Be(400);
         badRequest.Value.Should().Be("Page must be >= 1.");
+    }
+
+    [Fact]
+    public async Task GetUsersGeneralStatistics_ShouldReturnOk()
+    {
+        var stats = new UsersGeneralStatisticsDto();
+        _userServiceMock.Setup(x => x.GetUsersGeneralStatisticsAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(stats);
+
+        var result = await _controller.GetUsersGeneralStatistics(default);
+        var okResult = result.Result as OkObjectResult;
+        okResult.Should().NotBeNull();
+        okResult!.Value.Should().Be(stats);
+    }
+
+    [Fact]
+    public async Task GetUserStatistics_ShouldReturnOk_WhenUserExists()
+    {
+        var userId = Guid.NewGuid();
+        var stats = new UserStatisticsDto { UserId = userId };
+        _userServiceMock.Setup(x => x.GetUserStatisticsAsync(userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(stats);
+
+        var result = await _controller.GetUserStatistics(userId, default);
+        var okResult = result.Result as OkObjectResult;
+        okResult.Should().NotBeNull();
+        okResult!.Value.Should().Be(stats);
+    }
+
+    [Fact]
+    public async Task GetUserStatistics_ShouldThrowKeyNotFoundException_WhenUserDoesNotExist()
+    {
+        var userId = Guid.NewGuid();
+        _userServiceMock.Setup(x => x.GetUserStatisticsAsync(userId, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new KeyNotFoundException());
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => _controller.GetUserStatistics(userId, default));
+    }
+
+    [Fact]
+    public async Task AssignRole_ShouldReturnOk_WhenSuccess()
+    {
+        var userId = Guid.NewGuid();
+        var roleId = Guid.NewGuid();
+        _userServiceMock.Setup(x => x.AssignRoleAsync(userId, roleId, It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var result = await _controller.AssignRole(userId, roleId, default);
+        result.Should().BeOfType<OkResult>();
+    }
+
+    [Fact]
+    public async Task AssignRole_ShouldThrowInvalidOperationException_WhenServiceThrows()
+    {
+        var userId = Guid.NewGuid();
+        var roleId = Guid.NewGuid();
+        _userServiceMock.Setup(x => x.AssignRoleAsync(userId, roleId, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("User already has this role."));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _controller.AssignRole(userId, roleId, default));
+    }
+
+    [Fact]
+    public async Task RemoveRole_ShouldReturnNoContent_WhenSuccess()
+    {
+        var userId = Guid.NewGuid();
+        var roleId = Guid.NewGuid();
+        _userServiceMock.Setup(x => x.RemoveRoleAsync(userId, roleId, It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var result = await _controller.RemoveRole(userId, roleId, default);
+        result.Should().BeOfType<NoContentResult>();
+    }
+
+    [Fact]
+    public async Task RemoveRole_ShouldThrowKeyNotFoundException_WhenServiceThrows()
+    {
+        var userId = Guid.NewGuid();
+        var roleId = Guid.NewGuid();
+        _userServiceMock.Setup(x => x.RemoveRoleAsync(userId, roleId, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new KeyNotFoundException());
+
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => _controller.RemoveRole(userId, roleId, default));
     }
 }
