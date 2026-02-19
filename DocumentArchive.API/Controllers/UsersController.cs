@@ -1,10 +1,11 @@
 ﻿using DocumentArchive.Core.DTOs.Document;
 using DocumentArchive.Core.DTOs.Shared;
+using DocumentArchive.Core.DTOs.Statistics;
 using DocumentArchive.Core.DTOs.User;
-using DocumentArchive.Core.DTOs.Statistics; // для UserStatisticsDto, UsersGeneralStatisticsDto
 using DocumentArchive.Core.Interfaces.Services;
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
+// для UserStatisticsDto, UsersGeneralStatisticsDto
 
 namespace DocumentArchive.API.Controllers;
 
@@ -257,7 +258,8 @@ public class UsersController : ControllerBase
     [HttpGet("statistics/general")]
     [ProducesResponseType(typeof(UsersGeneralStatisticsDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<UsersGeneralStatisticsDto>> GetUsersGeneralStatistics(CancellationToken cancellationToken)
+    public async Task<ActionResult<UsersGeneralStatisticsDto>> GetUsersGeneralStatistics(
+        CancellationToken cancellationToken)
     {
         try
         {
@@ -297,4 +299,76 @@ public class UsersController : ControllerBase
                 new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
         }
     }
+    /// <summary>
+/// Назначает роль пользователю
+/// </summary>
+/// <param name="userId">Идентификатор пользователя</param>
+/// <param name="roleId">Идентификатор роли</param>
+/// <param name="cancellationToken">Токен отмены</param>
+/// <returns>200 OK в случае успеха</returns>
+[HttpPost("{userId}/roles/{roleId}")]
+[ProducesResponseType(StatusCodes.Status200OK)]
+[ProducesResponseType(StatusCodes.Status404NotFound)]
+[ProducesResponseType(StatusCodes.Status400BadRequest)]
+[ProducesResponseType(StatusCodes.Status500InternalServerError)]
+public async Task<IActionResult> AssignRole(Guid userId, Guid roleId, CancellationToken cancellationToken)
+{
+    try
+    {
+        await _userService.AssignRoleAsync(userId, roleId, cancellationToken);
+        return Ok();
+    }
+    catch (KeyNotFoundException ex)
+    {
+        return NotFound(ex.Message);
+    }
+    catch (InvalidOperationException ex)
+    {
+        return BadRequest(ex.Message);
+    }
+    catch (OperationCanceledException)
+    {
+        _logger.LogInformation("Request cancelled by client");
+        return StatusCode(499, "Request cancelled");
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Error assigning role {RoleId} to user {UserId}", roleId, userId);
+        return StatusCode(500, new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
+    }
+}
+
+/// <summary>
+/// Удаляет роль у пользователя
+/// </summary>
+/// <param name="userId">Идентификатор пользователя</param>
+/// <param name="roleId">Идентификатор роли</param>
+/// <param name="cancellationToken">Токен отмены</param>
+/// <returns>204 No Content в случае успеха</returns>
+[HttpDelete("{userId}/roles/{roleId}")]
+[ProducesResponseType(StatusCodes.Status204NoContent)]
+[ProducesResponseType(StatusCodes.Status404NotFound)]
+[ProducesResponseType(StatusCodes.Status500InternalServerError)]
+public async Task<IActionResult> RemoveRole(Guid userId, Guid roleId, CancellationToken cancellationToken)
+{
+    try
+    {
+        await _userService.RemoveRoleAsync(userId, roleId, cancellationToken);
+        return NoContent();
+    }
+    catch (KeyNotFoundException ex)
+    {
+        return NotFound(ex.Message);
+    }
+    catch (OperationCanceledException)
+    {
+        _logger.LogInformation("Request cancelled by client");
+        return StatusCode(499, "Request cancelled");
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Error removing role {RoleId} from user {UserId}", roleId, userId);
+        return StatusCode(500, new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
+    }
+}
 }

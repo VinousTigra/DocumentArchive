@@ -227,4 +227,49 @@ public class UserService : IUserService
             UsersByRegistrationDate = usersByDate
         };
     }
+    public async Task AssignRoleAsync(Guid userId, Guid roleId, CancellationToken cancellationToken = default)
+    {
+        // Проверяем существование пользователя
+        var user = await _context.Users
+            .FirstOrDefaultAsync(u => u.Id == userId && !u.IsDeleted, cancellationToken);
+        if (user == null)
+            throw new KeyNotFoundException($"User with id {userId} not found.");
+
+        // Проверяем существование роли
+        var role = await _context.Roles
+            .FirstOrDefaultAsync(r => r.Id == roleId, cancellationToken);
+        if (role == null)
+            throw new KeyNotFoundException($"Role with id {roleId} not found.");
+
+        // Проверяем, не назначена ли уже роль
+        var existing = await _context.UserRoles
+            .FirstOrDefaultAsync(ur => ur.UserId == userId && ur.RoleId == roleId, cancellationToken);
+        if (existing != null)
+            throw new InvalidOperationException("User already has this role.");
+
+        // Создаём связь
+        var userRole = new UserRole
+        {
+            UserId = userId,
+            RoleId = roleId
+        };
+        _context.UserRoles.Add(userRole);
+        await _context.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation("Role {RoleId} assigned to user {UserId}", roleId, userId);
+    }
+
+    public async Task RemoveRoleAsync(Guid userId, Guid roleId, CancellationToken cancellationToken = default)
+    {
+        var userRole = await _context.UserRoles
+            .FirstOrDefaultAsync(ur => ur.UserId == userId && ur.RoleId == roleId, cancellationToken);
+        if (userRole == null)
+            throw new KeyNotFoundException("User does not have this role.");
+
+        _context.UserRoles.Remove(userRole);
+        await _context.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation("Role {RoleId} removed from user {UserId}", roleId, userId);
+    }
+    
 }

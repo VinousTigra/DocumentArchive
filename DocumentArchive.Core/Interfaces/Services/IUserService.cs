@@ -17,13 +17,15 @@ public interface IUserService
     Task<UserResponseDto> CreateUserAsync(CreateUserDto createDto, CancellationToken cancellationToken = default);
     Task UpdateUserAsync(Guid id, UpdateUserDto updateDto, CancellationToken cancellationToken = default);
     Task DeleteUserAsync(Guid id, CancellationToken cancellationToken = default);
-    
+
     Task<PagedResult<DocumentListItemDto>> GetUserDocumentsAsync(
         Guid userId,
         int page,
         int pageSize,
         CancellationToken cancellationToken = default);
-    
+
     Task<UserStatisticsDto> GetUserStatisticsAsync(Guid userId, CancellationToken cancellationToken = default);
     Task<UsersGeneralStatisticsDto> GetUsersGeneralStatisticsAsync(CancellationToken cancellationToken = default);
+    Task AssignRoleAsync(Guid userId, Guid roleId, CancellationToken cancellationToken = default);
+    Task RemoveRoleAsync(Guid userId, Guid roleId, CancellationToken cancellationToken = default);
 }
