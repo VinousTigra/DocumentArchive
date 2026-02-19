@@ -123,7 +123,7 @@ public class ArchiveLogsController : ControllerBase
         catch (InvalidOperationException ex)
         {
             _logger.LogWarning(ex, "Business rule violation in create log");
-            return BadRequest("Operation cannot be completed due to business rule violation.");
+            return BadRequest(ex.Message);
         }
         catch (OperationCanceledException)
         {

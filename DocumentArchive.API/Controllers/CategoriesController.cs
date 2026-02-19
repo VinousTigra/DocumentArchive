@@ -1,10 +1,11 @@
 ﻿using DocumentArchive.Core.DTOs.Category;
 using DocumentArchive.Core.DTOs.Document;
 using DocumentArchive.Core.DTOs.Shared;
-using DocumentArchive.Core.DTOs.Statistics; // для CategoryWithDocumentCountDto
+using DocumentArchive.Core.DTOs.Statistics;
 using DocumentArchive.Core.Interfaces.Services;
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
+// для CategoryWithDocumentCountDto
 
 namespace DocumentArchive.API.Controllers;
 
@@ -15,8 +16,8 @@ public class CategoriesController : ControllerBase
 {
     private readonly ICategoryService _categoryService;
     private readonly IValidator<CreateCategoryDto> _createValidator;
-    private readonly IValidator<UpdateCategoryDto> _updateValidator;
     private readonly ILogger<CategoriesController> _logger;
+    private readonly IValidator<UpdateCategoryDto> _updateValidator;
 
     public CategoriesController(
         ICategoryService categoryService,
@@ -31,7 +32,7 @@ public class CategoriesController : ControllerBase
     }
 
     /// <summary>
-    /// Получает список категорий с пагинацией, поиском и сортировкой
+    ///     Получает список категорий с пагинацией, поиском и сортировкой
     /// </summary>
     [HttpGet]
     [ProducesResponseType(typeof(PagedResult<CategoryListItemDto>), StatusCodes.Status200OK)]
@@ -58,7 +59,8 @@ public class CategoriesController : ControllerBase
 
         try
         {
-            var result = await _categoryService.GetCategoriesAsync(page, pageSize, search, sortBy, sortOrder, cancellationToken);
+            var result =
+                await _categoryService.GetCategoriesAsync(page, pageSize, search, sortBy, sortOrder, cancellationToken);
             return Ok(result);
         }
         catch (OperationCanceledException)
@@ -69,12 +71,13 @@ public class CategoriesController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting categories");
-            return StatusCode(500, new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
+            return StatusCode(500,
+                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
         }
     }
 
     /// <summary>
-    /// Получает категорию по ID
+    ///     Получает категорию по ID
     /// </summary>
     [HttpGet("{id}")]
     [ProducesResponseType(typeof(CategoryResponseDto), StatusCodes.Status200OK)]
@@ -98,24 +101,23 @@ public class CategoriesController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting category by ID {CategoryId}", id);
-            return StatusCode(500, new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
+            return StatusCode(500,
+                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
         }
     }
 
     /// <summary>
-    /// Создаёт новую категорию
+    ///     Создаёт новую категорию
     /// </summary>
     [HttpPost]
     [ProducesResponseType(typeof(CategoryResponseDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<CategoryResponseDto>> Create([FromBody] CreateCategoryDto createDto, CancellationToken cancellationToken = default)
+    public async Task<ActionResult<CategoryResponseDto>> Create([FromBody] CreateCategoryDto createDto,
+        CancellationToken cancellationToken = default)
     {
         var validationResult = await _createValidator.ValidateAsync(createDto, cancellationToken);
-        if (!validationResult.IsValid)
-        {
-            return BadRequest(validationResult.Errors);
-        }
+        if (!validationResult.IsValid) return BadRequest(validationResult.Errors);
 
         try
         {
@@ -125,7 +127,7 @@ public class CategoriesController : ControllerBase
         catch (InvalidOperationException ex)
         {
             _logger.LogWarning(ex, "Business rule violation in create category");
-            return BadRequest("Operation cannot be completed due to business rule violation.");
+            return BadRequest(ex.Message);
         }
         catch (OperationCanceledException)
         {
@@ -135,25 +137,24 @@ public class CategoriesController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error creating category");
-            return StatusCode(500, new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
+            return StatusCode(500,
+                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
         }
     }
 
     /// <summary>
-    /// Обновляет категорию
+    ///     Обновляет категорию
     /// </summary>
     [HttpPut("{id}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateCategoryDto updateDto, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateCategoryDto updateDto,
+        CancellationToken cancellationToken = default)
     {
         var validationResult = await _updateValidator.ValidateAsync(updateDto, cancellationToken);
-        if (!validationResult.IsValid)
-        {
-            return BadRequest(validationResult.Errors);
-        }
+        if (!validationResult.IsValid) return BadRequest(validationResult.Errors);
 
         try
         {
@@ -167,7 +168,7 @@ public class CategoriesController : ControllerBase
         catch (InvalidOperationException ex)
         {
             _logger.LogWarning(ex, "Business rule violation in update category");
-            return BadRequest("Operation cannot be completed due to business rule violation.");
+            return BadRequest(ex.Message);
         }
         catch (OperationCanceledException)
         {
@@ -177,12 +178,13 @@ public class CategoriesController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error updating category {CategoryId}", id);
-            return StatusCode(500, new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
+            return StatusCode(500,
+                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
         }
     }
 
     /// <summary>
-    /// Удаляет категорию
+    ///     Удаляет категорию
     /// </summary>
     [HttpDelete("{id}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
@@ -203,7 +205,7 @@ public class CategoriesController : ControllerBase
         catch (InvalidOperationException ex)
         {
             _logger.LogWarning(ex, "Business rule violation in delete category");
-            return BadRequest("Operation cannot be completed due to business rule violation.");
+            return BadRequest(ex.Message);
         }
         catch (OperationCanceledException)
         {
@@ -213,12 +215,13 @@ public class CategoriesController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error deleting category {CategoryId}", id);
-            return StatusCode(500, new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
+            return StatusCode(500,
+                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
         }
     }
 
     /// <summary>
-    /// Получает документы в категории с пагинацией
+    ///     Получает документы в категории с пагинацией
     /// </summary>
     [HttpGet("{id}/documents")]
     [ProducesResponseType(typeof(PagedResult<DocumentListItemDto>), StatusCodes.Status200OK)]
@@ -253,17 +256,19 @@ public class CategoriesController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting documents for category {CategoryId}", id);
-            return StatusCode(500, new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
+            return StatusCode(500,
+                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
         }
     }
 
     /// <summary>
-    /// Получает список категорий с количеством документов в каждой
+    ///     Получает список категорий с количеством документов в каждой
     /// </summary>
     [HttpGet("with-document-count")]
     [ProducesResponseType(typeof(List<CategoryWithDocumentCountDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<List<CategoryWithDocumentCountDto>>> GetCategoriesWithDocumentCount(CancellationToken cancellationToken)
+    public async Task<ActionResult<List<CategoryWithDocumentCountDto>>> GetCategoriesWithDocumentCount(
+        CancellationToken cancellationToken)
     {
         try
         {
@@ -273,7 +278,8 @@ public class CategoriesController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting categories with document count");
-            return StatusCode(500, new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
+            return StatusCode(500,
+                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
         }
     }
 }

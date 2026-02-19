@@ -13,11 +13,11 @@ namespace DocumentArchive.API.Controllers;
 [Produces("application/json")]
 public class DocumentsController : ControllerBase
 {
-    private readonly IDocumentService _documentService;
-    private readonly IValidator<CreateDocumentDto> _createValidator;
-    private readonly IValidator<UpdateDocumentDto> _updateValidator;
-    private readonly ILogger<DocumentsController> _logger;
     private const int MaxBulkSize = 100;
+    private readonly IValidator<CreateDocumentDto> _createValidator;
+    private readonly IDocumentService _documentService;
+    private readonly ILogger<DocumentsController> _logger;
+    private readonly IValidator<UpdateDocumentDto> _updateValidator;
 
     public DocumentsController(
         IDocumentService documentService,
@@ -32,7 +32,7 @@ public class DocumentsController : ControllerBase
     }
 
     /// <summary>
-    /// Получает список документов с пагинацией, фильтрацией, поиском и множественной сортировкой
+    ///     Получает список документов с пагинацией, фильтрацией, поиском и множественной сортировкой
     /// </summary>
     [HttpGet]
     [ProducesResponseType(typeof(PagedResult<DocumentListItemDto>), StatusCodes.Status200OK)]
@@ -59,7 +59,8 @@ public class DocumentsController : ControllerBase
 
         // Простая проверка формата сортировки
         if (!string.IsNullOrWhiteSpace(sort) && !IsValidSortFormat(sort))
-            return BadRequest("Invalid sort format. Expected format: field:direction,field:direction (e.g., title:asc,uploadDate:desc)");
+            return BadRequest(
+                "Invalid sort format. Expected format: field:direction,field:direction (e.g., title:asc,uploadDate:desc)");
 
         try
         {
@@ -75,12 +76,13 @@ public class DocumentsController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting documents");
-            return StatusCode(500, new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
+            return StatusCode(500,
+                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
         }
     }
 
     /// <summary>
-    /// Получает документ по уникальному идентификатору
+    ///     Получает документ по уникальному идентификатору
     /// </summary>
     [HttpGet("{id}")]
     [ProducesResponseType(typeof(DocumentResponseDto), StatusCodes.Status200OK)]
@@ -104,25 +106,24 @@ public class DocumentsController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting document by ID {DocumentId}", id);
-            return StatusCode(500, new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
+            return StatusCode(500,
+                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
         }
     }
 
     /// <summary>
-    /// Создаёт новый документ
+    ///     Создаёт новый документ
     /// </summary>
     [HttpPost]
     [ProducesResponseType(typeof(DocumentResponseDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<DocumentResponseDto>> Create([FromBody] CreateDocumentDto createDto, CancellationToken cancellationToken = default)
+    public async Task<ActionResult<DocumentResponseDto>> Create([FromBody] CreateDocumentDto createDto,
+        CancellationToken cancellationToken = default)
     {
         // Ручная валидация
         var validationResult = await _createValidator.ValidateAsync(createDto, cancellationToken);
-        if (!validationResult.IsValid)
-        {
-            return BadRequest(validationResult.Errors);
-        }
+        if (!validationResult.IsValid) return BadRequest(validationResult.Errors);
 
         try
         {
@@ -132,7 +133,7 @@ public class DocumentsController : ControllerBase
         catch (InvalidOperationException ex)
         {
             _logger.LogWarning(ex, "Business rule violation in create document");
-            return BadRequest("Operation cannot be completed due to business rule violation.");
+            return BadRequest(ex.Message);
         }
         catch (OperationCanceledException)
         {
@@ -142,25 +143,24 @@ public class DocumentsController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error creating document");
-            return StatusCode(500, new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
+            return StatusCode(500,
+                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
         }
     }
 
     /// <summary>
-    /// Полностью обновляет документ
+    ///     Полностью обновляет документ
     /// </summary>
     [HttpPut("{id}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateDocumentDto updateDto, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateDocumentDto updateDto,
+        CancellationToken cancellationToken = default)
     {
         var validationResult = await _updateValidator.ValidateAsync(updateDto, cancellationToken);
-        if (!validationResult.IsValid)
-        {
-            return BadRequest(validationResult.Errors);
-        }
+        if (!validationResult.IsValid) return BadRequest(validationResult.Errors);
 
         try
         {
@@ -174,7 +174,7 @@ public class DocumentsController : ControllerBase
         catch (InvalidOperationException ex)
         {
             _logger.LogWarning(ex, "Business rule violation in update document");
-            return BadRequest("Operation cannot be completed due to business rule violation.");
+            return BadRequest(ex.Message);
         }
         catch (OperationCanceledException)
         {
@@ -184,12 +184,13 @@ public class DocumentsController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error updating document {DocumentId}", id);
-            return StatusCode(500, new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
+            return StatusCode(500,
+                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
         }
     }
 
     /// <summary>
-    /// Удаляет документ
+    ///     Удаляет документ
     /// </summary>
     [HttpDelete("{id}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
@@ -214,12 +215,13 @@ public class DocumentsController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error deleting document {DocumentId}", id);
-            return StatusCode(500, new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
+            return StatusCode(500,
+                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
         }
     }
 
     /// <summary>
-    /// Получает историю операций с документом с пагинацией
+    ///     Получает историю операций с документом с пагинацией
     /// </summary>
     [HttpGet("{id}/logs")]
     [ProducesResponseType(typeof(PagedResult<ArchiveLogListItemDto>), StatusCodes.Status200OK)]
@@ -254,12 +256,13 @@ public class DocumentsController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting logs for document {DocumentId}", id);
-            return StatusCode(500, new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
+            return StatusCode(500,
+                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
         }
     }
 
     /// <summary>
-    /// Массовое создание документов с детальным ответом
+    ///     Массовое создание документов с детальным ответом
     /// </summary>
     [HttpPost("bulk")]
     [ProducesResponseType(typeof(BulkOperationResult<Guid>), StatusCodes.Status200OK)]
@@ -287,12 +290,13 @@ public class DocumentsController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error in bulk create");
-            return StatusCode(500, new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
+            return StatusCode(500,
+                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
         }
     }
 
     /// <summary>
-    /// Массовое обновление документов с детальным ответом
+    ///     Массовое обновление документов с детальным ответом
     /// </summary>
     [HttpPut("bulk")]
     [ProducesResponseType(typeof(BulkOperationResult<Guid>), StatusCodes.Status200OK)]
@@ -320,12 +324,13 @@ public class DocumentsController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error in bulk update");
-            return StatusCode(500, new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
+            return StatusCode(500,
+                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
         }
     }
 
     /// <summary>
-    /// Массовое удаление документов с детальным ответом
+    ///     Массовое удаление документов с детальным ответом
     /// </summary>
     [HttpPost("bulk/delete")]
     [ProducesResponseType(typeof(BulkOperationResult<Guid>), StatusCodes.Status200OK)]
@@ -353,17 +358,19 @@ public class DocumentsController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error in bulk delete");
-            return StatusCode(500, new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
+            return StatusCode(500,
+                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
         }
     }
 
     /// <summary>
-    /// Получает количество документов по категориям (статистика)
+    ///     Получает количество документов по категориям (статистика)
     /// </summary>
     [HttpGet("statistics/by-category")]
     [ProducesResponseType(typeof(Dictionary<string, int>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<Dictionary<string, int>>> GetDocumentsCountByCategory(CancellationToken cancellationToken)
+    public async Task<ActionResult<Dictionary<string, int>>> GetDocumentsCountByCategory(
+        CancellationToken cancellationToken)
     {
         try
         {
@@ -373,12 +380,13 @@ public class DocumentsController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting document counts by category");
-            return StatusCode(500, new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
+            return StatusCode(500,
+                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
         }
     }
 
     /// <summary>
-    /// Получает общую статистику по документам
+    ///     Получает общую статистику по документам
     /// </summary>
     [HttpGet("statistics/summary")]
     [ProducesResponseType(typeof(DocumentsStatisticsDto), StatusCodes.Status200OK)]
@@ -393,7 +401,8 @@ public class DocumentsController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting document statistics");
-            return StatusCode(500, new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
+            return StatusCode(500,
+                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
         }
     }
 
@@ -417,6 +426,7 @@ public class DocumentsController : ControllerBase
                     return false;
             }
         }
+
         return true;
     }
 }
