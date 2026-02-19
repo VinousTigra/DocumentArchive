@@ -14,17 +14,14 @@ namespace DocumentArchive.API.Controllers;
 public class ArchiveLogsController : ControllerBase
 {
     private readonly IValidator<CreateArchiveLogDto> _createValidator;
-    private readonly ILogger<ArchiveLogsController> _logger;
     private readonly IArchiveLogService _logService;
 
     public ArchiveLogsController(
         IArchiveLogService logService,
-        IValidator<CreateArchiveLogDto> createValidator,
-        ILogger<ArchiveLogsController> logger)
+        IValidator<CreateArchiveLogDto> createValidator)
     {
         _logService = logService;
         _createValidator = createValidator;
-        _logger = logger;
     }
 
     /// <summary>
@@ -52,23 +49,9 @@ public class ArchiveLogsController : ControllerBase
         if (fromDate.HasValue && toDate.HasValue && fromDate > toDate)
             return BadRequest("fromDate cannot be later than toDate.");
 
-        try
-        {
-            var result = await _logService.GetLogsAsync(
-                page, pageSize, documentId, userId, fromDate, toDate, actionType, isCritical, cancellationToken);
-            return Ok(result);
-        }
-        catch (OperationCanceledException)
-        {
-            _logger.LogInformation("Request cancelled by client");
-            return StatusCode(499, "Request cancelled");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting logs");
-            return StatusCode(500,
-                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
-        }
+        var result = await _logService.GetLogsAsync(
+            page, pageSize, documentId, userId, fromDate, toDate, actionType, isCritical, cancellationToken);
+        return Ok(result);
     }
 
     /// <summary>
@@ -81,25 +64,10 @@ public class ArchiveLogsController : ControllerBase
     public async Task<ActionResult<ArchiveLogResponseDto>> GetById(Guid id,
         CancellationToken cancellationToken = default)
     {
-        try
-        {
-            var log = await _logService.GetLogByIdAsync(id, cancellationToken);
-            if (log == null)
-                return NotFound();
-
-            return Ok(log);
-        }
-        catch (OperationCanceledException)
-        {
-            _logger.LogInformation("Request cancelled by client");
-            return StatusCode(499, "Request cancelled");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting log by ID {LogId}", id);
-            return StatusCode(500,
-                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
-        }
+        var log = await _logService.GetLogByIdAsync(id, cancellationToken);
+        if (log == null)
+            return NotFound();
+        return Ok(log);
     }
 
     /// <summary>
@@ -113,29 +81,11 @@ public class ArchiveLogsController : ControllerBase
         CancellationToken cancellationToken = default)
     {
         var validationResult = await _createValidator.ValidateAsync(createDto, cancellationToken);
-        if (!validationResult.IsValid) return BadRequest(validationResult.Errors);
+        if (!validationResult.IsValid)
+            return BadRequest(validationResult.Errors);
 
-        try
-        {
-            var log = await _logService.CreateLogAsync(createDto, cancellationToken);
-            return CreatedAtAction(nameof(GetById), new { id = log.Id }, log);
-        }
-        catch (InvalidOperationException ex)
-        {
-            _logger.LogWarning(ex, "Business rule violation in create log");
-            return BadRequest(ex.Message);
-        }
-        catch (OperationCanceledException)
-        {
-            _logger.LogInformation("Request cancelled by client");
-            return StatusCode(499, "Request cancelled");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error creating log");
-            return StatusCode(500,
-                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
-        }
+        var log = await _logService.CreateLogAsync(createDto, cancellationToken);
+        return CreatedAtAction(nameof(GetById), new { id = log.Id }, log);
     }
 
     /// <summary>
@@ -147,26 +97,8 @@ public class ArchiveLogsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken = default)
     {
-        try
-        {
-            await _logService.DeleteLogAsync(id, cancellationToken);
-            return NoContent();
-        }
-        catch (KeyNotFoundException)
-        {
-            return NotFound();
-        }
-        catch (OperationCanceledException)
-        {
-            _logger.LogInformation("Request cancelled by client");
-            return StatusCode(499, "Request cancelled");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error deleting log {LogId}", id);
-            return StatusCode(500,
-                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
-        }
+        await _logService.DeleteLogAsync(id, cancellationToken);
+        return NoContent();
     }
 
     /// <summary>
@@ -180,17 +112,8 @@ public class ArchiveLogsController : ControllerBase
         [FromQuery] DateTime? toDate = null,
         CancellationToken cancellationToken = default)
     {
-        try
-        {
-            var result = await _logService.GetLogsCountByActionTypeAsync(fromDate, toDate, cancellationToken);
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting logs count by action type");
-            return StatusCode(500,
-                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
-        }
+        var result = await _logService.GetLogsCountByActionTypeAsync(fromDate, toDate, cancellationToken);
+        return Ok(result);
     }
 
     /// <summary>
@@ -204,16 +127,7 @@ public class ArchiveLogsController : ControllerBase
         [FromQuery] DateTime? toDate = null,
         CancellationToken cancellationToken = default)
     {
-        try
-        {
-            var result = await _logService.GetLogsStatisticsAsync(fromDate, toDate, cancellationToken);
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting logs statistics");
-            return StatusCode(500,
-                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
-        }
+        var result = await _logService.GetLogsStatisticsAsync(fromDate, toDate, cancellationToken);
+        return Ok(result);
     }
 }

@@ -16,19 +16,16 @@ public class DocumentsController : ControllerBase
     private const int MaxBulkSize = 100;
     private readonly IValidator<CreateDocumentDto> _createValidator;
     private readonly IDocumentService _documentService;
-    private readonly ILogger<DocumentsController> _logger;
     private readonly IValidator<UpdateDocumentDto> _updateValidator;
 
     public DocumentsController(
         IDocumentService documentService,
         IValidator<CreateDocumentDto> createValidator,
-        IValidator<UpdateDocumentDto> updateValidator,
-        ILogger<DocumentsController> logger)
+        IValidator<UpdateDocumentDto> updateValidator)
     {
         _documentService = documentService;
         _createValidator = createValidator;
         _updateValidator = updateValidator;
-        _logger = logger;
     }
 
     /// <summary>
@@ -49,36 +46,19 @@ public class DocumentsController : ControllerBase
         [FromQuery] string? sort = null,
         CancellationToken cancellationToken = default)
     {
-        // Валидация параметров
         if (page < 1)
             return BadRequest("Page must be greater than or equal to 1.");
         if (pageSize < 1 || pageSize > 100)
             return BadRequest("Page size must be between 1 and 100.");
         if (fromDate.HasValue && toDate.HasValue && fromDate > toDate)
             return BadRequest("fromDate cannot be later than toDate.");
-
-        // Простая проверка формата сортировки
         if (!string.IsNullOrWhiteSpace(sort) && !IsValidSortFormat(sort))
             return BadRequest(
                 "Invalid sort format. Expected format: field:direction,field:direction (e.g., title:asc,uploadDate:desc)");
 
-        try
-        {
-            var result = await _documentService.GetDocumentsAsync(
-                page, pageSize, search, categoryIds, userId, fromDate, toDate, sort, cancellationToken);
-            return Ok(result);
-        }
-        catch (OperationCanceledException)
-        {
-            _logger.LogInformation("Request cancelled by client");
-            return StatusCode(499, "Request cancelled");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting documents");
-            return StatusCode(500,
-                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
-        }
+        var result = await _documentService.GetDocumentsAsync(
+            page, pageSize, search, categoryIds, userId, fromDate, toDate, sort, cancellationToken);
+        return Ok(result);
     }
 
     /// <summary>
@@ -90,25 +70,10 @@ public class DocumentsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<DocumentResponseDto>> GetById(Guid id, CancellationToken cancellationToken = default)
     {
-        try
-        {
-            var document = await _documentService.GetDocumentByIdAsync(id, cancellationToken);
-            if (document == null)
-                return NotFound();
-
-            return Ok(document);
-        }
-        catch (OperationCanceledException)
-        {
-            _logger.LogInformation("Request cancelled by client");
-            return StatusCode(499, "Request cancelled");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting document by ID {DocumentId}", id);
-            return StatusCode(500,
-                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
-        }
+        var document = await _documentService.GetDocumentByIdAsync(id, cancellationToken);
+        if (document == null)
+            return NotFound();
+        return Ok(document);
     }
 
     /// <summary>
@@ -121,31 +86,12 @@ public class DocumentsController : ControllerBase
     public async Task<ActionResult<DocumentResponseDto>> Create([FromBody] CreateDocumentDto createDto,
         CancellationToken cancellationToken = default)
     {
-        // Ручная валидация
         var validationResult = await _createValidator.ValidateAsync(createDto, cancellationToken);
-        if (!validationResult.IsValid) return BadRequest(validationResult.Errors);
+        if (!validationResult.IsValid)
+            return BadRequest(validationResult.Errors);
 
-        try
-        {
-            var result = await _documentService.CreateDocumentAsync(createDto, cancellationToken);
-            return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
-        }
-        catch (InvalidOperationException ex)
-        {
-            _logger.LogWarning(ex, "Business rule violation in create document");
-            return BadRequest(ex.Message);
-        }
-        catch (OperationCanceledException)
-        {
-            _logger.LogInformation("Request cancelled by client");
-            return StatusCode(499, "Request cancelled");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error creating document");
-            return StatusCode(500,
-                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
-        }
+        var result = await _documentService.CreateDocumentAsync(createDto, cancellationToken);
+        return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
     }
 
     /// <summary>
@@ -160,33 +106,11 @@ public class DocumentsController : ControllerBase
         CancellationToken cancellationToken = default)
     {
         var validationResult = await _updateValidator.ValidateAsync(updateDto, cancellationToken);
-        if (!validationResult.IsValid) return BadRequest(validationResult.Errors);
+        if (!validationResult.IsValid)
+            return BadRequest(validationResult.Errors);
 
-        try
-        {
-            await _documentService.UpdateDocumentAsync(id, updateDto, cancellationToken);
-            return NoContent();
-        }
-        catch (KeyNotFoundException)
-        {
-            return NotFound();
-        }
-        catch (InvalidOperationException ex)
-        {
-            _logger.LogWarning(ex, "Business rule violation in update document");
-            return BadRequest(ex.Message);
-        }
-        catch (OperationCanceledException)
-        {
-            _logger.LogInformation("Request cancelled by client");
-            return StatusCode(499, "Request cancelled");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error updating document {DocumentId}", id);
-            return StatusCode(500,
-                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
-        }
+        await _documentService.UpdateDocumentAsync(id, updateDto, cancellationToken);
+        return NoContent();
     }
 
     /// <summary>
@@ -198,26 +122,8 @@ public class DocumentsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken = default)
     {
-        try
-        {
-            await _documentService.DeleteDocumentAsync(id, cancellationToken);
-            return NoContent();
-        }
-        catch (KeyNotFoundException)
-        {
-            return NotFound();
-        }
-        catch (OperationCanceledException)
-        {
-            _logger.LogInformation("Request cancelled by client");
-            return StatusCode(499, "Request cancelled");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error deleting document {DocumentId}", id);
-            return StatusCode(500,
-                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
-        }
+        await _documentService.DeleteDocumentAsync(id, cancellationToken);
+        return NoContent();
     }
 
     /// <summary>
@@ -239,26 +145,8 @@ public class DocumentsController : ControllerBase
         if (pageSize < 1 || pageSize > 100)
             return BadRequest("Page size must be between 1 and 100.");
 
-        try
-        {
-            var result = await _documentService.GetDocumentLogsAsync(id, page, pageSize, cancellationToken);
-            return Ok(result);
-        }
-        catch (KeyNotFoundException)
-        {
-            return NotFound();
-        }
-        catch (OperationCanceledException)
-        {
-            _logger.LogInformation("Request cancelled by client");
-            return StatusCode(499, "Request cancelled");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting logs for document {DocumentId}", id);
-            return StatusCode(500,
-                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
-        }
+        var result = await _documentService.GetDocumentLogsAsync(id, page, pageSize, cancellationToken);
+        return Ok(result);
     }
 
     /// <summary>
@@ -277,22 +165,8 @@ public class DocumentsController : ControllerBase
         if (createDtos.Count > MaxBulkSize)
             return BadRequest($"Too many items in bulk request. Maximum allowed: {MaxBulkSize}.");
 
-        try
-        {
-            var result = await _documentService.CreateBulkAsync(createDtos, cancellationToken);
-            return Ok(result);
-        }
-        catch (OperationCanceledException)
-        {
-            _logger.LogInformation("Request cancelled by client");
-            return StatusCode(499, "Request cancelled");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error in bulk create");
-            return StatusCode(500,
-                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
-        }
+        var result = await _documentService.CreateBulkAsync(createDtos, cancellationToken);
+        return Ok(result);
     }
 
     /// <summary>
@@ -311,22 +185,8 @@ public class DocumentsController : ControllerBase
         if (updateDtos.Count > MaxBulkSize)
             return BadRequest($"Too many items in bulk request. Maximum allowed: {MaxBulkSize}.");
 
-        try
-        {
-            var result = await _documentService.UpdateBulkAsync(updateDtos, cancellationToken);
-            return Ok(result);
-        }
-        catch (OperationCanceledException)
-        {
-            _logger.LogInformation("Request cancelled by client");
-            return StatusCode(499, "Request cancelled");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error in bulk update");
-            return StatusCode(500,
-                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
-        }
+        var result = await _documentService.UpdateBulkAsync(updateDtos, cancellationToken);
+        return Ok(result);
     }
 
     /// <summary>
@@ -345,22 +205,8 @@ public class DocumentsController : ControllerBase
         if (ids.Length > MaxBulkSize)
             return BadRequest($"Too many items in bulk request. Maximum allowed: {MaxBulkSize}.");
 
-        try
-        {
-            var result = await _documentService.DeleteBulkAsync(ids, cancellationToken);
-            return Ok(result);
-        }
-        catch (OperationCanceledException)
-        {
-            _logger.LogInformation("Request cancelled by client");
-            return StatusCode(499, "Request cancelled");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error in bulk delete");
-            return StatusCode(500,
-                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
-        }
+        var result = await _documentService.DeleteBulkAsync(ids, cancellationToken);
+        return Ok(result);
     }
 
     /// <summary>
@@ -372,17 +218,8 @@ public class DocumentsController : ControllerBase
     public async Task<ActionResult<Dictionary<string, int>>> GetDocumentsCountByCategory(
         CancellationToken cancellationToken)
     {
-        try
-        {
-            var result = await _documentService.GetDocumentsCountByCategoryAsync(cancellationToken);
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting document counts by category");
-            return StatusCode(500,
-                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
-        }
+        var result = await _documentService.GetDocumentsCountByCategoryAsync(cancellationToken);
+        return Ok(result);
     }
 
     /// <summary>
@@ -393,17 +230,8 @@ public class DocumentsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<DocumentsStatisticsDto>> GetDocumentsStatistics(CancellationToken cancellationToken)
     {
-        try
-        {
-            var result = await _documentService.GetDocumentsStatisticsAsync(cancellationToken);
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting document statistics");
-            return StatusCode(500,
-                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
-        }
+        var result = await _documentService.GetDocumentsStatisticsAsync(cancellationToken);
+        return Ok(result);
     }
 
     private static bool IsValidSortFormat(string sort)

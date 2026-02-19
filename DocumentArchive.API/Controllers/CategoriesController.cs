@@ -5,7 +5,6 @@ using DocumentArchive.Core.DTOs.Statistics;
 using DocumentArchive.Core.Interfaces.Services;
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
-// для CategoryWithDocumentCountDto
 
 namespace DocumentArchive.API.Controllers;
 
@@ -16,19 +15,16 @@ public class CategoriesController : ControllerBase
 {
     private readonly ICategoryService _categoryService;
     private readonly IValidator<CreateCategoryDto> _createValidator;
-    private readonly ILogger<CategoriesController> _logger;
     private readonly IValidator<UpdateCategoryDto> _updateValidator;
 
     public CategoriesController(
         ICategoryService categoryService,
         IValidator<CreateCategoryDto> createValidator,
-        IValidator<UpdateCategoryDto> updateValidator,
-        ILogger<CategoriesController> logger)
+        IValidator<UpdateCategoryDto> updateValidator)
     {
         _categoryService = categoryService;
         _createValidator = createValidator;
         _updateValidator = updateValidator;
-        _logger = logger;
     }
 
     /// <summary>
@@ -57,23 +53,9 @@ public class CategoriesController : ControllerBase
         if (!string.IsNullOrWhiteSpace(sortBy) && !allowedSortFields.Contains(sortBy.ToLowerInvariant()))
             return BadRequest($"Invalid sort field. Allowed values: {string.Join(", ", allowedSortFields)}.");
 
-        try
-        {
-            var result =
-                await _categoryService.GetCategoriesAsync(page, pageSize, search, sortBy, sortOrder, cancellationToken);
-            return Ok(result);
-        }
-        catch (OperationCanceledException)
-        {
-            _logger.LogInformation("Request cancelled by client");
-            return StatusCode(499, "Request cancelled");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting categories");
-            return StatusCode(500,
-                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
-        }
+        var result =
+            await _categoryService.GetCategoriesAsync(page, pageSize, search, sortBy, sortOrder, cancellationToken);
+        return Ok(result);
     }
 
     /// <summary>
@@ -85,25 +67,10 @@ public class CategoriesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<CategoryResponseDto>> GetById(Guid id, CancellationToken cancellationToken = default)
     {
-        try
-        {
-            var category = await _categoryService.GetCategoryByIdAsync(id, cancellationToken);
-            if (category == null)
-                return NotFound();
-
-            return Ok(category);
-        }
-        catch (OperationCanceledException)
-        {
-            _logger.LogInformation("Request cancelled by client");
-            return StatusCode(499, "Request cancelled");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting category by ID {CategoryId}", id);
-            return StatusCode(500,
-                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
-        }
+        var category = await _categoryService.GetCategoryByIdAsync(id, cancellationToken);
+        if (category == null)
+            return NotFound();
+        return Ok(category);
     }
 
     /// <summary>
@@ -117,29 +84,11 @@ public class CategoriesController : ControllerBase
         CancellationToken cancellationToken = default)
     {
         var validationResult = await _createValidator.ValidateAsync(createDto, cancellationToken);
-        if (!validationResult.IsValid) return BadRequest(validationResult.Errors);
+        if (!validationResult.IsValid)
+            return BadRequest(validationResult.Errors);
 
-        try
-        {
-            var result = await _categoryService.CreateCategoryAsync(createDto, cancellationToken);
-            return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
-        }
-        catch (InvalidOperationException ex)
-        {
-            _logger.LogWarning(ex, "Business rule violation in create category");
-            return BadRequest(ex.Message);
-        }
-        catch (OperationCanceledException)
-        {
-            _logger.LogInformation("Request cancelled by client");
-            return StatusCode(499, "Request cancelled");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error creating category");
-            return StatusCode(500,
-                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
-        }
+        var result = await _categoryService.CreateCategoryAsync(createDto, cancellationToken);
+        return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
     }
 
     /// <summary>
@@ -154,33 +103,11 @@ public class CategoriesController : ControllerBase
         CancellationToken cancellationToken = default)
     {
         var validationResult = await _updateValidator.ValidateAsync(updateDto, cancellationToken);
-        if (!validationResult.IsValid) return BadRequest(validationResult.Errors);
+        if (!validationResult.IsValid)
+            return BadRequest(validationResult.Errors);
 
-        try
-        {
-            await _categoryService.UpdateCategoryAsync(id, updateDto, cancellationToken);
-            return NoContent();
-        }
-        catch (KeyNotFoundException)
-        {
-            return NotFound();
-        }
-        catch (InvalidOperationException ex)
-        {
-            _logger.LogWarning(ex, "Business rule violation in update category");
-            return BadRequest(ex.Message);
-        }
-        catch (OperationCanceledException)
-        {
-            _logger.LogInformation("Request cancelled by client");
-            return StatusCode(499, "Request cancelled");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error updating category {CategoryId}", id);
-            return StatusCode(500,
-                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
-        }
+        await _categoryService.UpdateCategoryAsync(id, updateDto, cancellationToken);
+        return NoContent();
     }
 
     /// <summary>
@@ -193,31 +120,8 @@ public class CategoriesController : ControllerBase
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken = default)
     {
-        try
-        {
-            await _categoryService.DeleteCategoryAsync(id, cancellationToken);
-            return NoContent();
-        }
-        catch (KeyNotFoundException)
-        {
-            return NotFound();
-        }
-        catch (InvalidOperationException ex)
-        {
-            _logger.LogWarning(ex, "Business rule violation in delete category");
-            return BadRequest(ex.Message);
-        }
-        catch (OperationCanceledException)
-        {
-            _logger.LogInformation("Request cancelled by client");
-            return StatusCode(499, "Request cancelled");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error deleting category {CategoryId}", id);
-            return StatusCode(500,
-                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
-        }
+        await _categoryService.DeleteCategoryAsync(id, cancellationToken);
+        return NoContent();
     }
 
     /// <summary>
@@ -239,26 +143,8 @@ public class CategoriesController : ControllerBase
         if (pageSize < 1 || pageSize > 100)
             return BadRequest("Page size must be between 1 and 100.");
 
-        try
-        {
-            var result = await _categoryService.GetCategoryDocumentsAsync(id, page, pageSize, cancellationToken);
-            return Ok(result);
-        }
-        catch (KeyNotFoundException)
-        {
-            return NotFound();
-        }
-        catch (OperationCanceledException)
-        {
-            _logger.LogInformation("Request cancelled by client");
-            return StatusCode(499, "Request cancelled");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting documents for category {CategoryId}", id);
-            return StatusCode(500,
-                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
-        }
+        var result = await _categoryService.GetCategoryDocumentsAsync(id, page, pageSize, cancellationToken);
+        return Ok(result);
     }
 
     /// <summary>
@@ -270,16 +156,7 @@ public class CategoriesController : ControllerBase
     public async Task<ActionResult<List<CategoryWithDocumentCountDto>>> GetCategoriesWithDocumentCount(
         CancellationToken cancellationToken)
     {
-        try
-        {
-            var result = await _categoryService.GetCategoriesWithDocumentCountAsync(cancellationToken);
-            return Ok(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting categories with document count");
-            return StatusCode(500,
-                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
-        }
+        var result = await _categoryService.GetCategoriesWithDocumentCountAsync(cancellationToken);
+        return Ok(result);
     }
 }

@@ -9,13 +9,11 @@ namespace DocumentArchive.API.Controllers;
 [Produces("application/json")]
 public class PermissionsController : ControllerBase
 {
-    private readonly ILogger<PermissionsController> _logger;
     private readonly IPermissionService _permissionService;
 
-    public PermissionsController(IPermissionService permissionService, ILogger<PermissionsController> logger)
+    public PermissionsController(IPermissionService permissionService)
     {
         _permissionService = permissionService;
-        _logger = logger;
     }
 
     /// <summary>
@@ -26,22 +24,8 @@ public class PermissionsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<List<PermissionListItemDto>>> GetAll(CancellationToken cancellationToken)
     {
-        try
-        {
-            var permissions = await _permissionService.GetAllAsync(cancellationToken);
-            return Ok(permissions);
-        }
-        catch (OperationCanceledException)
-        {
-            _logger.LogInformation("Request cancelled by client");
-            return StatusCode(499, "Request cancelled");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting permissions");
-            return StatusCode(500,
-                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
-        }
+        var permissions = await _permissionService.GetAllAsync(cancellationToken);
+        return Ok(permissions);
     }
 
     /// <summary>
@@ -53,24 +37,10 @@ public class PermissionsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<PermissionResponseDto>> GetById(Guid id, CancellationToken cancellationToken)
     {
-        try
-        {
-            var permission = await _permissionService.GetByIdAsync(id, cancellationToken);
-            if (permission == null)
-                return NotFound();
-            return Ok(permission);
-        }
-        catch (OperationCanceledException)
-        {
-            _logger.LogInformation("Request cancelled by client");
-            return StatusCode(499, "Request cancelled");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting permission by ID {PermissionId}", id);
-            return StatusCode(500,
-                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
-        }
+        var permission = await _permissionService.GetByIdAsync(id, cancellationToken);
+        if (permission == null)
+            return NotFound();
+        return Ok(permission);
     }
 
     /// <summary>
@@ -83,27 +53,8 @@ public class PermissionsController : ControllerBase
     public async Task<ActionResult<PermissionResponseDto>> Create([FromBody] CreatePermissionDto dto,
         CancellationToken cancellationToken)
     {
-        try
-        {
-            var permission = await _permissionService.CreateAsync(dto, cancellationToken);
-            return CreatedAtAction(nameof(GetById), new { id = permission.Id }, permission);
-        }
-        catch (InvalidOperationException ex)
-        {
-            _logger.LogWarning(ex, "Business rule violation in create permission");
-            return BadRequest(ex.Message);
-        }
-        catch (OperationCanceledException)
-        {
-            _logger.LogInformation("Request cancelled by client");
-            return StatusCode(499, "Request cancelled");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error creating permission");
-            return StatusCode(500,
-                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
-        }
+        var permission = await _permissionService.CreateAsync(dto, cancellationToken);
+        return CreatedAtAction(nameof(GetById), new { id = permission.Id }, permission);
     }
 
     /// <summary>
@@ -117,31 +68,8 @@ public class PermissionsController : ControllerBase
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdatePermissionDto dto,
         CancellationToken cancellationToken)
     {
-        try
-        {
-            await _permissionService.UpdateAsync(id, dto, cancellationToken);
-            return NoContent();
-        }
-        catch (KeyNotFoundException)
-        {
-            return NotFound();
-        }
-        catch (InvalidOperationException ex)
-        {
-            _logger.LogWarning(ex, "Business rule violation in update permission");
-            return BadRequest(ex.Message);
-        }
-        catch (OperationCanceledException)
-        {
-            _logger.LogInformation("Request cancelled by client");
-            return StatusCode(499, "Request cancelled");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error updating permission {PermissionId}", id);
-            return StatusCode(500,
-                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
-        }
+        await _permissionService.UpdateAsync(id, dto, cancellationToken);
+        return NoContent();
     }
 
     /// <summary>
@@ -154,30 +82,7 @@ public class PermissionsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {
-        try
-        {
-            await _permissionService.DeleteAsync(id, cancellationToken);
-            return NoContent();
-        }
-        catch (KeyNotFoundException)
-        {
-            return NotFound();
-        }
-        catch (InvalidOperationException ex)
-        {
-            _logger.LogWarning(ex, "Business rule violation in delete permission");
-            return BadRequest(ex.Message);
-        }
-        catch (OperationCanceledException)
-        {
-            _logger.LogInformation("Request cancelled by client");
-            return StatusCode(499, "Request cancelled");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error deleting permission {PermissionId}", id);
-            return StatusCode(500,
-                new { error = "An internal error occurred.", traceId = HttpContext.TraceIdentifier });
-        }
+        await _permissionService.DeleteAsync(id, cancellationToken);
+        return NoContent();
     }
 }
