@@ -12,5 +12,6 @@ public class DocumentVersion
     public string? Comment { get; set; }
     public DateTime UploadedAt { get; set; } = DateTime.UtcNow;
     public Guid? UploadedBy { get; set; }
-    public DateTime? UpdatedAt { get; set; } // добавить (может использоваться при изменении комментария)
+    
+    public DateTime? UpdatedAt { get; set; } 
 }
