@@ -1,9 +1,9 @@
-﻿using System.Security.Claims;
-using DocumentArchive.Core.DTOs.Auth;
+﻿using DocumentArchive.Core.DTOs.Auth;
 using DocumentArchive.Core.Interfaces.Services;
 using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace DocumentArchive.API.Controllers;
 
@@ -12,8 +12,8 @@ namespace DocumentArchive.API.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
-    private readonly IValidator<LoginDto> _loginValidator;
     private readonly IValidator<RegisterDto> _registerValidator;
+    private readonly IValidator<LoginDto> _loginValidator;
 
     public AuthController(
         IAuthService authService,
@@ -26,6 +26,8 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("register")]
+    [ProducesResponseType(typeof(AuthResponseDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Register(RegisterDto registerDto)
     {
         var validationResult = await _registerValidator.ValidateAsync(registerDto);
@@ -37,7 +39,7 @@ public class AuthController : ControllerBase
             var deviceInfo = Request.Headers["User-Agent"].ToString();
             var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
             var result = await _authService.RegisterAsync(registerDto, deviceInfo, ipAddress);
-            return Ok(result);
+            return CreatedAtAction(nameof(GetProfile), new { }, result);
         }
         catch (InvalidOperationException ex)
         {
@@ -46,6 +48,9 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("login")]
+    [ProducesResponseType(typeof(AuthResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> Login(LoginDto loginDto)
     {
         var validationResult = await _loginValidator.ValidateAsync(loginDto);
@@ -66,6 +71,8 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("refresh")]
+    [ProducesResponseType(typeof(AuthResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> Refresh(RefreshTokenDto refreshTokenDto)
     {
         try
@@ -81,12 +88,54 @@ public class AuthController : ControllerBase
         }
     }
 
+    [Authorize]
     [HttpPost("logout")]
-    [Authorize] // потребуется using Microsoft.AspNetCore.Authorization;
+    [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> Logout()
     {
-        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (Guid.TryParse(userIdClaim, out var userId)) await _authService.LogoutAsync(userId);
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (Guid.TryParse(userIdClaim, out var userId))
+        {
+            await _authService.LogoutAsync(userId);
+        }
         return Ok();
+    }
+
+    [Authorize]
+    [HttpPost("revoke")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> RevokeToken([FromBody] string refreshToken)
+    {
+        try
+        {
+            await _authService.RevokeTokenAsync(refreshToken);
+            return Ok();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound(new { message = "Refresh token not found" });
+        }
+    }
+
+    [Authorize]
+    [HttpGet("profile")]
+    [ProducesResponseType(typeof(AuthResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetProfile()
+    {
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!Guid.TryParse(userIdClaim, out var userId))
+            return Unauthorized();
+
+        try
+        {
+            var result = await _authService.GetProfileAsync(userId);
+            return Ok(result);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
     }
 }

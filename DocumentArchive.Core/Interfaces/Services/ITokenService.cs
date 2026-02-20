@@ -9,4 +9,6 @@ public interface ITokenService
     Task<UserSession?> ValidateRefreshTokenAsync(Guid userId, string refreshToken);
     Task RevokeRefreshTokenAsync(Guid sessionId);
     Task RevokeAllUserSessionsAsync(Guid userId);
+    DateTime GetAccessTokenExpiry();
+    DateTime GetRefreshTokenExpiry();
 }

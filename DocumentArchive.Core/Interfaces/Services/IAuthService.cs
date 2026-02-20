@@ -9,4 +9,5 @@ public interface IAuthService
     Task<AuthResponseDto> RefreshTokenAsync(RefreshTokenDto refreshTokenDto, string deviceInfo, string ipAddress);
     Task LogoutAsync(Guid userId);
     Task RevokeTokenAsync(string refreshToken);
+    Task<AuthResponseDto> GetProfileAsync(Guid userId);
 }

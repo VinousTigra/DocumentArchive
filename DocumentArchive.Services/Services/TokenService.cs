@@ -133,4 +133,16 @@ public class TokenService : ITokenService
 
         return Convert.ToBase64String(randomBytes);
     }
+    
+    public DateTime GetAccessTokenExpiry()
+    {
+        var minutes = int.Parse(_configuration.GetSection("JwtSettings")["AccessTokenExpirationMinutes"] ?? "15");
+        return DateTime.UtcNow.AddMinutes(minutes);
+    }
+
+    public DateTime GetRefreshTokenExpiry()
+    {
+        var days = int.Parse(_configuration.GetSection("JwtSettings")["RefreshTokenExpirationDays"] ?? "7");
+        return DateTime.UtcNow.AddDays(days);
+    }
 }
