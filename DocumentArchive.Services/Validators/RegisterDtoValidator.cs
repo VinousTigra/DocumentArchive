@@ -38,7 +38,7 @@ public class RegisterDtoValidator : AbstractValidator<RegisterDto>
 
         When(x => x.DateOfBirth.HasValue, () =>
         {
-            RuleFor(x => x.DateOfBirth.Value)
+            RuleFor(x => x.DateOfBirth!.Value)
                 .LessThan(DateTime.Today.AddYears(-18))
                 .WithMessage("You must be at least 18 years old")
                 .LessThan(DateTime.Today)

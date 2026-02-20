@@ -49,6 +49,10 @@ public class TokenService : ITokenService
         foreach (var permission in permissions)
             claims.Add(new Claim("permission", permission));
 
+        secretKey = jwtSettings["SecretKey"];
+        if (string.IsNullOrEmpty(secretKey))
+            throw new InvalidOperationException("JWT SecretKey is not configured.");
+        
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 

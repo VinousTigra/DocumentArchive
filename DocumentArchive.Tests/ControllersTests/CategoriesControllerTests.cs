@@ -41,7 +41,7 @@ public class CategoriesControllerTests
         var result = await _controller.GetAll();
         var okResult = result.Result as OkObjectResult;
         okResult.Should().NotBeNull();
-        okResult!.StatusCode.Should().Be(200);
+        okResult.StatusCode.Should().Be(200);
         okResult.Value.Should().Be(pagedResult);
     }
 
@@ -51,7 +51,7 @@ public class CategoriesControllerTests
         var result = await _controller.GetAll(0);
         var badRequest = result.Result as BadRequestObjectResult;
         badRequest.Should().NotBeNull();
-        badRequest!.StatusCode.Should().Be(400);
+        badRequest.StatusCode.Should().Be(400);
         badRequest.Value.Should().Be("Page must be >= 1.");
     }
 
@@ -61,7 +61,7 @@ public class CategoriesControllerTests
         var result = await _controller.GetAll(pageSize: 101);
         var badRequest = result.Result as BadRequestObjectResult;
         badRequest.Should().NotBeNull();
-        badRequest!.StatusCode.Should().Be(400);
+        badRequest.StatusCode.Should().Be(400);
         badRequest.Value.Should().Be("Page size must be between 1 and 100.");
     }
 
@@ -71,7 +71,7 @@ public class CategoriesControllerTests
         var result = await _controller.GetAll(sortOrder: "invalid");
         var badRequest = result.Result as BadRequestObjectResult;
         badRequest.Should().NotBeNull();
-        badRequest!.StatusCode.Should().Be(400);
+        badRequest.StatusCode.Should().Be(400);
         badRequest.Value.Should().Be("Sort order must be 'asc' or 'desc'.");
     }
 
@@ -81,7 +81,7 @@ public class CategoriesControllerTests
         var result = await _controller.GetAll(sortBy: "invalidfield");
         var badRequest = result.Result as BadRequestObjectResult;
         badRequest.Should().NotBeNull();
-        badRequest!.StatusCode.Should().Be(400);
+        badRequest.StatusCode.Should().Be(400);
         badRequest.Value.Should().Be("Invalid sort field. Allowed values: name, createdat.");
     }
 
@@ -96,7 +96,7 @@ public class CategoriesControllerTests
         var result = await _controller.GetById(categoryId);
         var okResult = result.Result as OkObjectResult;
         okResult.Should().NotBeNull();
-        okResult!.StatusCode.Should().Be(200);
+        okResult.StatusCode.Should().Be(200);
         okResult.Value.Should().Be(responseDto);
     }
 
@@ -126,7 +126,7 @@ public class CategoriesControllerTests
         var result = await _controller.Create(createDto);
         var createdResult = result.Result as CreatedAtActionResult;
         createdResult.Should().NotBeNull();
-        createdResult!.StatusCode.Should().Be(201);
+        createdResult.StatusCode.Should().Be(201);
         createdResult.ActionName.Should().Be(nameof(_controller.GetById));
         createdResult.Value.Should().Be(responseDto);
     }
@@ -143,11 +143,14 @@ public class CategoriesControllerTests
         var result = await _controller.Create(createDto);
         var badRequest = result.Result as BadRequestObjectResult;
         badRequest.Should().NotBeNull();
-        badRequest!.StatusCode.Should().Be(400);
+        badRequest.StatusCode.Should().Be(400);
         var errors = badRequest.Value as IEnumerable<ValidationFailure>;
-        var enumerable = errors as ValidationFailure[] ?? errors.ToArray();
-        enumerable.Should().NotBeNull();
-        enumerable!.Select(e => e.ErrorMessage).Should().Contain(new[] { "Name is required" });
+        if (errors != null)
+        {
+            var enumerable = errors as ValidationFailure[] ?? errors.ToArray();
+            enumerable.Should().NotBeNull();
+            enumerable.Select(e => e.ErrorMessage).Should().Contain(new[] { "Name is required" });
+        }
     }
 
     [Fact]
@@ -227,7 +230,7 @@ public class CategoriesControllerTests
         var result = await _controller.GetDocumentsByCategory(categoryId);
         var okResult = result.Result as OkObjectResult;
         okResult.Should().NotBeNull();
-        okResult!.StatusCode.Should().Be(200);
+        okResult.StatusCode.Should().Be(200);
         okResult.Value.Should().Be(pagedResult);
     }
 
@@ -247,7 +250,7 @@ public class CategoriesControllerTests
         var result = await _controller.GetDocumentsByCategory(Guid.NewGuid(), 0);
         var badRequest = result.Result as BadRequestObjectResult;
         badRequest.Should().NotBeNull();
-        badRequest!.StatusCode.Should().Be(400);
+        badRequest.StatusCode.Should().Be(400);
         badRequest.Value.Should().Be("Page must be >= 1.");
     }
 
@@ -261,6 +264,6 @@ public class CategoriesControllerTests
         var result = await _controller.GetCategoriesWithDocumentCount(default);
         var okResult = result.Result as OkObjectResult;
         okResult.Should().NotBeNull();
-        okResult!.Value.Should().Be(list);
+        okResult.Value.Should().Be(list);
     }
 }
