@@ -21,7 +21,6 @@ public class AppDbContext : DbContext
     public DbSet<ArchiveLog> ArchiveLogs => Set<ArchiveLog>();
     public DbSet<UserSession> UserSessions => Set<UserSession>();
     public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
-    public DbSet<EmailConfirmationToken> EmailConfirmationTokens => Set<EmailConfirmationToken>();
     public DbSet<SecurityAuditLog> SecurityAuditLogs => Set<SecurityAuditLog>();
     public DbSet<UserClaim> UserClaims => Set<UserClaim>();
 
@@ -355,7 +354,6 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<PasswordResetToken>(entity =>
         {
             entity.HasKey(t => t.Id);
-            entity.Property(t => t.Token).IsRequired().HasMaxLength(500);
             entity.Property(t => t.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
             entity.HasOne(t => t.User)
@@ -363,23 +361,7 @@ public class AppDbContext : DbContext
                 .HasForeignKey(t => t.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            entity.HasIndex(t => t.Token).IsUnique();
             entity.HasIndex(t => t.ExpiresAt);
-        });
-
-        modelBuilder.Entity<EmailConfirmationToken>(entity =>
-        {
-            entity.HasKey(e => e.Id);
-            entity.Property(e => e.TokenHash).IsRequired().HasMaxLength(500);
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-            entity.HasOne(e => e.User)
-                .WithMany() // если нужно, добавьте коллекцию в User: public ICollection<EmailConfirmationToken> EmailConfirmationTokens { get; set; }
-                .HasForeignKey(e => e.UserId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            entity.HasIndex(e => e.TokenHash);
-            entity.HasIndex(e => e.ExpiresAt);
         });
 
         modelBuilder.Entity<SecurityAuditLog>(entity =>

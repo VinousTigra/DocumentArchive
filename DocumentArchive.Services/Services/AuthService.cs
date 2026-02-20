@@ -86,7 +86,7 @@ public class AuthService : IAuthService
             user.PasswordHash = passwordHash;
             user.CreatedAt = DateTime.UtcNow;
             user.IsActive = true;
-            user.IsEmailConfirmed = false;
+            user.IsEmailConfirmed = true;
             user.IsDeleted = false;
 
             _context.Users.Add(user);
@@ -98,20 +98,10 @@ public class AuthService : IAuthService
 
             _context.UserRoles.Add(new UserRole { UserId = user.Id, RoleId = userRole.Id });
 
-            // Генерация токена подтверждения email
-            var confirmationToken = GenerateSecureToken();
-            var emailToken = new EmailConfirmationToken
-            {
-                UserId = user.Id,
-                TokenHash = BCrypt.Net.BCrypt.HashPassword(confirmationToken),
-                ExpiresAt = DateTime.UtcNow.AddDays(7)
-            };
-            _context.EmailConfirmationTokens.Add(emailToken);
 
             await _context.SaveChangesAsync();
 
             _logger.LogInformation("User {UserId} registered", user.Id);
-            _logger.LogDebug("Email confirmation token for user {UserId}: {Token}", user.Id, confirmationToken);
 
             // Логирование успеха
             await _auditService.LogAsync(
@@ -239,7 +229,8 @@ public class AuthService : IAuthService
         }
     }
 
-    public async Task<AuthResponseDto> RefreshTokenAsync(RefreshTokenDto refreshTokenDto, string deviceInfo, string ipAddress)
+    public async Task<AuthResponseDto> RefreshTokenAsync(RefreshTokenDto refreshTokenDto, string deviceInfo,
+        string ipAddress)
     {
         try
         {
@@ -247,18 +238,21 @@ public class AuthService : IAuthService
             ClaimsPrincipal principal;
             try
             {
-                principal = handler.ValidateToken(refreshTokenDto.AccessToken, _tokenValidationParameters, out var validatedToken);
+                principal = handler.ValidateToken(refreshTokenDto.AccessToken, _tokenValidationParameters,
+                    out var validatedToken);
             }
             catch (SecurityTokenException)
             {
-                await _auditService.LogAsync(SecurityEventType.TokenRefresh, null, null, ipAddress, deviceInfo, false, new { Reason = "Invalid access token signature" });
+                await _auditService.LogAsync(SecurityEventType.TokenRefresh, null, null, ipAddress, deviceInfo, false,
+                    new { Reason = "Invalid access token signature" });
                 throw new UnauthorizedAccessException("Invalid token");
             }
 
             var userIdClaim = principal.FindFirst(JwtRegisteredClaimNames.Sub);
             if (userIdClaim == null || !Guid.TryParse(userIdClaim.Value, out var userId))
             {
-                await _auditService.LogAsync(SecurityEventType.TokenRefresh, null, null, ipAddress, deviceInfo, false, new { Reason = "Invalid access token claims" });
+                await _auditService.LogAsync(SecurityEventType.TokenRefresh, null, null, ipAddress, deviceInfo, false,
+                    new { Reason = "Invalid access token claims" });
                 throw new UnauthorizedAccessException("Invalid token");
             }
 
@@ -268,14 +262,16 @@ public class AuthService : IAuthService
                 .FirstOrDefaultAsync(u => u.Id == userId && u.IsActive && !u.IsDeleted);
             if (user == null)
             {
-                await _auditService.LogAsync(SecurityEventType.TokenRefresh, userId, null, ipAddress, deviceInfo, false, new { Reason = "User not found or inactive" });
+                await _auditService.LogAsync(SecurityEventType.TokenRefresh, userId, null, ipAddress, deviceInfo, false,
+                    new { Reason = "User not found or inactive" });
                 throw new UnauthorizedAccessException("User not found");
             }
 
             var session = await _tokenService.ValidateRefreshTokenAsync(userId, refreshTokenDto.RefreshToken);
             if (session == null)
             {
-                await _auditService.LogAsync(SecurityEventType.TokenRefresh, userId, user.Email, ipAddress, deviceInfo, false, new { Reason = "Invalid refresh token" });
+                await _auditService.LogAsync(SecurityEventType.TokenRefresh, userId, user.Email, ipAddress, deviceInfo,
+                    false, new { Reason = "Invalid refresh token" });
                 throw new UnauthorizedAccessException("Invalid refresh token");
             }
 
@@ -291,7 +287,8 @@ public class AuthService : IAuthService
             var newAccessToken = _tokenService.GenerateAccessToken(user, roles, permissions);
             var newRefreshToken = await _tokenService.GenerateRefreshTokenAsync(user.Id, deviceInfo, ipAddress);
 
-            await _auditService.LogAsync(SecurityEventType.TokenRefresh, userId, user.Email, ipAddress, deviceInfo, true, new { OldSessionId = session.Id });
+            await _auditService.LogAsync(SecurityEventType.TokenRefresh, userId, user.Email, ipAddress, deviceInfo,
+                true, new { OldSessionId = session.Id });
 
             return new AuthResponseDto
             {
@@ -313,7 +310,8 @@ public class AuthService : IAuthService
         }
         catch (Exception ex)
         {
-            await _auditService.LogAsync(SecurityEventType.TokenRefresh, null, null, ipAddress, deviceInfo, false, new { Reason = ex.Message });
+            await _auditService.LogAsync(SecurityEventType.TokenRefresh, null, null, ipAddress, deviceInfo, false,
+                new { Reason = ex.Message });
             throw;
         }
     }
@@ -323,7 +321,8 @@ public class AuthService : IAuthService
         var user = await _context.Users.FindAsync(userId);
         if (user == null)
         {
-            await _auditService.LogAsync(SecurityEventType.Logout, userId, null, ipAddress, deviceInfo, false, new { Reason = "User not found" });
+            await _auditService.LogAsync(SecurityEventType.Logout, userId, null, ipAddress, deviceInfo, false,
+                new { Reason = "User not found" });
             throw new KeyNotFoundException("User not found");
         }
 
@@ -341,14 +340,16 @@ public class AuthService : IAuthService
         var session = sessions.FirstOrDefault(s => BCrypt.Net.BCrypt.Verify(refreshToken, s.RefreshTokenHash));
         if (session == null)
         {
-            await _auditService.LogAsync(SecurityEventType.TokenRevoke, null, null, ipAddress, deviceInfo, false, new { Reason = "Refresh token not found or expired" });
+            await _auditService.LogAsync(SecurityEventType.TokenRevoke, null, null, ipAddress, deviceInfo, false,
+                new { Reason = "Refresh token not found or expired" });
             throw new KeyNotFoundException("Refresh token not found or already expired");
         }
 
         session.IsRevoked = true;
         await _context.SaveChangesAsync();
 
-        await _auditService.LogAsync(SecurityEventType.TokenRevoke, session.UserId, session.User?.Email, ipAddress, deviceInfo, true, new { SessionId = session.Id });
+        await _auditService.LogAsync(SecurityEventType.TokenRevoke, session.UserId, session.User?.Email, ipAddress,
+            deviceInfo, true, new { SessionId = session.Id });
     }
 
     public async Task<AuthResponseDto> GetProfileAsync(Guid userId)
@@ -378,8 +379,10 @@ public class AuthService : IAuthService
         var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
         if (user == null)
         {
-            await _auditService.LogAsync(SecurityEventType.PasswordResetRequested, null, dto.Email, ipAddress, deviceInfo, false, new { Reason = "Email not found" });
-            _logger.LogInformation("Password reset requested for non-existent email {Email} from IP {IpAddress}", dto.Email, ipAddress);
+            await _auditService.LogAsync(SecurityEventType.PasswordResetRequested, null, dto.Email, ipAddress,
+                deviceInfo, false, new { Reason = "Email not found" });
+            _logger.LogInformation("Password reset requested for non-existent email {Email} from IP {IpAddress}",
+                dto.Email, ipAddress);
             return;
         }
 
@@ -398,9 +401,11 @@ public class AuthService : IAuthService
         _context.PasswordResetTokens.Add(tokenEntity);
         await _context.SaveChangesAsync();
 
-        await _auditService.LogAsync(SecurityEventType.PasswordResetRequested, user.Id, user.Email, ipAddress, deviceInfo, true, new { TokenExpiry = tokenEntity.ExpiresAt });
+        await _auditService.LogAsync(SecurityEventType.PasswordResetRequested, user.Id, user.Email, ipAddress,
+            deviceInfo, true, new { TokenExpiry = tokenEntity.ExpiresAt });
 
-        _logger.LogInformation("Password reset token generated for user {UserId} from IP {IpAddress}", user.Id, ipAddress);
+        _logger.LogInformation("Password reset token generated for user {UserId} from IP {IpAddress}", user.Id,
+            ipAddress);
     }
 
     public async Task ResetPasswordAsync(ResetPasswordDto dto, string ipAddress, string deviceInfo)
@@ -412,14 +417,16 @@ public class AuthService : IAuthService
         var tokenEntity = allTokens.FirstOrDefault(t => BCrypt.Net.BCrypt.Verify(dto.Token, t.TokenHash));
         if (tokenEntity == null)
         {
-            await _auditService.LogAsync(SecurityEventType.PasswordReset, null, null, ipAddress, deviceInfo, false, new { Reason = "Invalid or expired token" });
+            await _auditService.LogAsync(SecurityEventType.PasswordReset, null, null, ipAddress, deviceInfo, false,
+                new { Reason = "Invalid or expired token" });
             throw new InvalidOperationException("Invalid or expired reset token");
         }
 
         var user = tokenEntity.User;
         if (user == null)
         {
-            await _auditService.LogAsync(SecurityEventType.PasswordReset, null, null, ipAddress, deviceInfo, false, new { Reason = "User not found" });
+            await _auditService.LogAsync(SecurityEventType.PasswordReset, null, null, ipAddress, deviceInfo, false,
+                new { Reason = "User not found" });
             throw new InvalidOperationException("User not found");
         }
 
@@ -432,18 +439,21 @@ public class AuthService : IAuthService
         await _auditService.LogAsync(SecurityEventType.PasswordReset, user.Id, user.Email, ipAddress, deviceInfo, true);
     }
 
-    public async Task ChangePasswordAsync(Guid userId, ChangePasswordDto dto, string? ipAddress = null, string? deviceInfo = null)
+    public async Task ChangePasswordAsync(Guid userId, ChangePasswordDto dto, string? ipAddress = null,
+        string? deviceInfo = null)
     {
         var user = await _context.Users.FindAsync(userId);
         if (user == null)
         {
-            await _auditService.LogAsync(SecurityEventType.PasswordChange, userId, null, ipAddress, deviceInfo, false, new { Reason = "User not found" });
+            await _auditService.LogAsync(SecurityEventType.PasswordChange, userId, null, ipAddress, deviceInfo, false,
+                new { Reason = "User not found" });
             throw new KeyNotFoundException("User not found");
         }
 
         if (!BCrypt.Net.BCrypt.Verify(dto.CurrentPassword, user.PasswordHash))
         {
-            await _auditService.LogAsync(SecurityEventType.PasswordChange, userId, user.Email, ipAddress, deviceInfo, false, new { Reason = "Incorrect current password" });
+            await _auditService.LogAsync(SecurityEventType.PasswordChange, userId, user.Email, ipAddress, deviceInfo,
+                false, new { Reason = "Incorrect current password" });
             throw new UnauthorizedAccessException("Current password is incorrect");
         }
 
@@ -453,40 +463,6 @@ public class AuthService : IAuthService
         await _context.SaveChangesAsync();
 
         await _auditService.LogAsync(SecurityEventType.PasswordChange, userId, user.Email, ipAddress, deviceInfo, true);
-    }
-
-    public async Task ConfirmEmailAsync(ConfirmEmailDto dto, string ipAddress, string deviceInfo)
-    {
-        var allTokens = await _context.EmailConfirmationTokens
-            .Include(t => t.User)
-            .Where(t => !t.IsUsed && t.ExpiresAt > DateTime.UtcNow && t.UserId == dto.UserId)
-            .ToListAsync();
-        var tokenEntity = allTokens.FirstOrDefault(t => BCrypt.Net.BCrypt.Verify(dto.Token, t.TokenHash));
-        if (tokenEntity == null)
-        {
-            await _auditService.LogAsync(SecurityEventType.EmailConfirmed, dto.UserId, null, ipAddress, deviceInfo, false, new { Reason = "Invalid or expired token" });
-            throw new InvalidOperationException("Invalid or expired confirmation token");
-        }
-
-        var user = tokenEntity.User;
-        if (user == null)
-        {
-            await _auditService.LogAsync(SecurityEventType.EmailConfirmed, dto.UserId, null, ipAddress, deviceInfo, false, new { Reason = "User not found" });
-            throw new KeyNotFoundException("User not found");
-        }
-
-        if (user.IsEmailConfirmed)
-        {
-            await _auditService.LogAsync(SecurityEventType.EmailConfirmed, user.Id, user.Email, ipAddress, deviceInfo, false, new { Reason = "Email already confirmed" });
-            throw new InvalidOperationException("Email already confirmed");
-        }
-
-        user.IsEmailConfirmed = true;
-        user.UpdatedAt = DateTime.UtcNow;
-        tokenEntity.IsUsed = true;
-        await _context.SaveChangesAsync();
-
-        await _auditService.LogAsync(SecurityEventType.EmailConfirmed, user.Id, user.Email, ipAddress, deviceInfo, true);
     }
 
     #endregion

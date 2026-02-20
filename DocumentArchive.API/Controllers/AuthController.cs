@@ -13,7 +13,6 @@ public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
     private readonly IValidator<ChangePasswordDto> _changePasswordValidator;
-    private readonly IValidator<ConfirmEmailDto> _confirmEmailValidator;
     private readonly IValidator<ForgotPasswordDto> _forgotPasswordValidator;
     private readonly IValidator<LoginDto> _loginValidator;
     private readonly IValidator<RegisterDto> _registerValidator;
@@ -25,8 +24,7 @@ public class AuthController : ControllerBase
         IValidator<LoginDto> loginValidator,
         IValidator<ForgotPasswordDto> forgotPasswordValidator,
         IValidator<ResetPasswordDto> resetPasswordValidator,
-        IValidator<ChangePasswordDto> changePasswordValidator,
-        IValidator<ConfirmEmailDto> confirmEmailValidator)
+        IValidator<ChangePasswordDto> changePasswordValidator)
     {
         _authService = authService;
         _registerValidator = registerValidator;
@@ -34,7 +32,6 @@ public class AuthController : ControllerBase
         _forgotPasswordValidator = forgotPasswordValidator;
         _resetPasswordValidator = resetPasswordValidator;
         _changePasswordValidator = changePasswordValidator;
-        _confirmEmailValidator = confirmEmailValidator;
     }
 
     [HttpPost("register")]
@@ -222,32 +219,6 @@ public class AuthController : ControllerBase
         catch (KeyNotFoundException ex)
         {
             return NotFound(new { message = ex.Message });
-        }
-    }
-
-    [HttpPost("confirm-email")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> ConfirmEmail([FromBody] ConfirmEmailDto dto)
-    {
-        var validationResult = await _confirmEmailValidator.ValidateAsync(dto);
-        if (!validationResult.IsValid)
-            return BadRequest(validationResult.Errors);
-
-        try
-        {
-            var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-            var deviceInfo = Request.Headers["User-Agent"].ToString();
-            await _authService.ConfirmEmailAsync(dto, ipAddress, deviceInfo);
-            return Ok(new { message = "Email confirmed successfully" });
-        }
-        catch (KeyNotFoundException)
-        {
-            return NotFound(new { message = "User not found" });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { message = ex.Message });
         }
     }
 }

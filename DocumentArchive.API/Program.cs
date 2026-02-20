@@ -54,7 +54,6 @@ builder.Services.AddAuthentication(options =>
 builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("RequireAdminRole", policy => policy.RequireRole("Admin"));
-    options.AddPolicy("EmailConfirmed", policy => policy.RequireClaim("IsEmailConfirmed", "True"));
     options.AddPolicy("MinimumAge18", policy => policy.Requirements.Add(new MinimumAgeRequirement(18)));
     options.AddPolicy("CanEditDocument",
         policy => policy.Requirements.Add(new PermissionRequirement("EditOwnDocuments", "EditAnyDocument")));

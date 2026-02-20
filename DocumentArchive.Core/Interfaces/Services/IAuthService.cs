@@ -13,5 +13,4 @@ public interface IAuthService
     Task ForgotPasswordAsync(ForgotPasswordDto dto, string ipAddress, string deviceInfo);
     Task ResetPasswordAsync(ResetPasswordDto dto, string ipAddress, string deviceInfo);
     Task ChangePasswordAsync(Guid userId, ChangePasswordDto dto, string? ipAddress = null, string? deviceInfo = null);
-    Task ConfirmEmailAsync(ConfirmEmailDto dto, string ipAddress, string deviceInfo);
 }
