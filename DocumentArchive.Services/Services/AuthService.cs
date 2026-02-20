@@ -1,5 +1,7 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using System.Security.Cryptography;
+using System.Text;
 using AutoMapper;
 using DocumentArchive.Core.DTOs.Auth;
 using DocumentArchive.Core.Interfaces.Services;
@@ -8,6 +10,7 @@ using DocumentArchive.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.IdentityModel.Tokens;
 
 namespace DocumentArchive.Services.Services;
 
@@ -19,6 +22,7 @@ public class AuthService : IAuthService
     private readonly ILogger<AuthService> _logger;
     private readonly IMapper _mapper;
     private readonly ITokenService _tokenService;
+    private readonly TokenValidationParameters _tokenValidationParameters;
 
     public AuthService(
         AppDbContext context,
@@ -34,7 +38,24 @@ public class AuthService : IAuthService
         _logger = logger;
         _configuration = configuration;
         _auditService = auditService;
+        _configuration = configuration;
+        _auditService = auditService;
+
+        var jwtSettings = configuration.GetSection("JwtSettings");
+        var secretKey = jwtSettings["SecretKey"];
+        _tokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = false, // не проверяем срок
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = jwtSettings["Issuer"],
+            ValidAudience = jwtSettings["Audience"],
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey)),
+            ClockSkew = TimeSpan.Zero
+        };
     }
+
 
     #region Helper Methods
 
@@ -227,22 +248,28 @@ public class AuthService : IAuthService
     {
         try
         {
-            // Извлечение userId из истекшего access token (без проверки срока)
             var handler = new JwtSecurityTokenHandler();
-            var jwtToken = handler.ReadJwtToken(refreshTokenDto.AccessToken);
-            var userIdClaim = jwtToken.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Sub);
-            if (userIdClaim == null || !Guid.TryParse(userIdClaim.Value, out var userId))
+            ClaimsPrincipal principal;
+            try
             {
-                await _auditService.LogAsync(
-                    SecurityEventType.TokenRefresh,
-                    null,
-                    null,
-                    ipAddress,
-                    deviceInfo,
-                    false,
-                    new { Reason = "Invalid access token" });
+                principal = handler.ValidateToken(refreshTokenDto.AccessToken, _tokenValidationParameters,
+                    out var validatedToken);
+            }
+            catch (SecurityTokenException)
+            {
+                await _auditService.LogAsync(SecurityEventType.TokenRefresh, null, null, ipAddress, deviceInfo, false,
+                    new { Reason = "Invalid access token signature" });
                 throw new UnauthorizedAccessException("Invalid token");
             }
+
+            var userIdClaim = principal.FindFirst(JwtRegisteredClaimNames.Sub);
+            if (userIdClaim == null || !Guid.TryParse(userIdClaim.Value, out var userId))
+            {
+                await _auditService.LogAsync(SecurityEventType.TokenRefresh, null, null, ipAddress, deviceInfo, false,
+                    new { Reason = "Invalid access token claims" });
+                throw new UnauthorizedAccessException("Invalid token");
+            }
+
 
             var user = await _context.Users
                 .Include(u => u.UserRoles)

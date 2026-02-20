@@ -1,9 +1,9 @@
-﻿using DocumentArchive.Core.DTOs.Auth;
+﻿using System.Security.Claims;
+using DocumentArchive.Core.DTOs.Auth;
 using DocumentArchive.Core.Interfaces.Services;
 using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
 
 namespace DocumentArchive.API.Controllers;
 
@@ -12,12 +12,12 @@ namespace DocumentArchive.API.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
-    private readonly IValidator<RegisterDto> _registerValidator;
-    private readonly IValidator<LoginDto> _loginValidator;
-    private readonly IValidator<ForgotPasswordDto> _forgotPasswordValidator;
-    private readonly IValidator<ResetPasswordDto> _resetPasswordValidator;
     private readonly IValidator<ChangePasswordDto> _changePasswordValidator;
     private readonly IValidator<ConfirmEmailDto> _confirmEmailValidator;
+    private readonly IValidator<ForgotPasswordDto> _forgotPasswordValidator;
+    private readonly IValidator<LoginDto> _loginValidator;
+    private readonly IValidator<RegisterDto> _registerValidator;
+    private readonly IValidator<ResetPasswordDto> _resetPasswordValidator;
 
     public AuthController(
         IAuthService authService,
@@ -36,7 +36,6 @@ public class AuthController : ControllerBase
         _changePasswordValidator = changePasswordValidator;
         _confirmEmailValidator = confirmEmailValidator;
     }
-
 
     [HttpPost("register")]
     [ProducesResponseType(typeof(AuthResponseDto), StatusCodes.Status201Created)]
@@ -109,8 +108,11 @@ public class AuthController : ControllerBase
         var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (Guid.TryParse(userIdClaim, out var userId))
         {
-            await _authService.LogoutAsync(userId);
+            var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+            var deviceInfo = Request.Headers["User-Agent"].ToString();
+            await _authService.LogoutAsync(userId, ipAddress, deviceInfo);
         }
+
         return Ok();
     }
 
@@ -122,7 +124,9 @@ public class AuthController : ControllerBase
     {
         try
         {
-            await _authService.RevokeTokenAsync(refreshToken);
+            var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+            var deviceInfo = Request.Headers["User-Agent"].ToString();
+            await _authService.RevokeTokenAsync(refreshToken, ipAddress, deviceInfo);
             return Ok();
         }
         catch (KeyNotFoundException)
@@ -151,94 +155,99 @@ public class AuthController : ControllerBase
             return NotFound();
         }
     }
-    
+
     [HttpPost("forgot-password")]
-[ProducesResponseType(StatusCodes.Status200OK)]
-[ProducesResponseType(StatusCodes.Status400BadRequest)]
-public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDto dto)
-{
-    var validationResult = await _forgotPasswordValidator.ValidateAsync(dto);
-    if (!validationResult.IsValid)
-        return BadRequest(validationResult.Errors);
-
-    var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-    await _authService.ForgotPasswordAsync(dto, ipAddress);
-    return Ok(new { message = "If the email exists, a reset link has been sent" });
-}
-
-[HttpPost("reset-password")]
-[ProducesResponseType(StatusCodes.Status200OK)]
-[ProducesResponseType(StatusCodes.Status400BadRequest)]
-public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto dto)
-{
-    var validationResult = await _resetPasswordValidator.ValidateAsync(dto);
-    if (!validationResult.IsValid)
-        return BadRequest(validationResult.Errors);
-
-    try
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDto dto)
     {
+        var validationResult = await _forgotPasswordValidator.ValidateAsync(dto);
+        if (!validationResult.IsValid)
+            return BadRequest(validationResult.Errors);
+
         var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-        await _authService.ResetPasswordAsync(dto, ipAddress);
-        return Ok(new { message = "Password has been reset successfully" });
+        var deviceInfo = Request.Headers["User-Agent"].ToString();
+        await _authService.ForgotPasswordAsync(dto, ipAddress, deviceInfo);
+        return Ok(new { message = "If the email exists, a reset link has been sent" });
     }
-    catch (InvalidOperationException ex)
-    {
-        return BadRequest(new { message = ex.Message });
-    }
-}
 
-[Authorize]
-[HttpPost("change-password")]
-[ProducesResponseType(StatusCodes.Status200OK)]
-[ProducesResponseType(StatusCodes.Status400BadRequest)]
-[ProducesResponseType(StatusCodes.Status401Unauthorized)]
-public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto dto)
-{
-    var validationResult = await _changePasswordValidator.ValidateAsync(dto);
-    if (!validationResult.IsValid)
-        return BadRequest(validationResult.Errors);
+    [HttpPost("reset-password")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto dto)
+    {
+        var validationResult = await _resetPasswordValidator.ValidateAsync(dto);
+        if (!validationResult.IsValid)
+            return BadRequest(validationResult.Errors);
 
-    var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
-    if (!Guid.TryParse(userIdClaim, out var userId))
-        return Unauthorized();
+        try
+        {
+            var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            var deviceInfo = Request.Headers["User-Agent"].ToString();
+            await _authService.ResetPasswordAsync(dto, ipAddress, deviceInfo);
+            return Ok(new { message = "Password has been reset successfully" });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
 
-    try
+    [Authorize]
+    [HttpPost("change-password")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto dto)
     {
-        await _authService.ChangePasswordAsync(userId, dto);
-        return Ok(new { message = "Password changed successfully" });
-    }
-    catch (UnauthorizedAccessException ex)
-    {
-        return Unauthorized(new { message = ex.Message });
-    }
-    catch (KeyNotFoundException ex)
-    {
-        return NotFound(new { message = ex.Message });
-    }
-}
+        var validationResult = await _changePasswordValidator.ValidateAsync(dto);
+        if (!validationResult.IsValid)
+            return BadRequest(validationResult.Errors);
 
-[HttpPost("confirm-email")]
-[ProducesResponseType(StatusCodes.Status200OK)]
-[ProducesResponseType(StatusCodes.Status400BadRequest)]
-public async Task<IActionResult> ConfirmEmail([FromBody] ConfirmEmailDto dto)
-{
-    var validationResult = await _confirmEmailValidator.ValidateAsync(dto);
-    if (!validationResult.IsValid)
-        return BadRequest(validationResult.Errors);
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!Guid.TryParse(userIdClaim, out var userId))
+            return Unauthorized();
 
-    try
-    {
-        await _authService.ConfirmEmailAsync(dto);
-        return Ok(new { message = "Email confirmed successfully" });
+        try
+        {
+            var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+            var deviceInfo = Request.Headers["User-Agent"].ToString();
+            await _authService.ChangePasswordAsync(userId, dto, ipAddress, deviceInfo);
+            return Ok(new { message = "Password changed successfully" });
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Unauthorized(new { message = ex.Message });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
     }
-    catch (KeyNotFoundException)
+
+    [HttpPost("confirm-email")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ConfirmEmail([FromBody] ConfirmEmailDto dto)
     {
-        return NotFound(new { message = "User not found" });
+        var validationResult = await _confirmEmailValidator.ValidateAsync(dto);
+        if (!validationResult.IsValid)
+            return BadRequest(validationResult.Errors);
+
+        try
+        {
+            var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            var deviceInfo = Request.Headers["User-Agent"].ToString();
+            await _authService.ConfirmEmailAsync(dto, ipAddress, deviceInfo);
+            return Ok(new { message = "Email confirmed successfully" });
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound(new { message = "User not found" });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
-    catch (InvalidOperationException ex)
-    {
-        return BadRequest(new { message = ex.Message });
-    }
-}
-    
 }

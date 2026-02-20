@@ -9,6 +9,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Scalar.AspNetCore;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.HttpOverrides;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -24,7 +26,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 // JWT настройки
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
-var secretKey = jwtSettings["SecretKey"];
+var secretKey = jwtSettings["SecretKey"] ?? throw new InvalidOperationException("JWT SecretKey is not configured. Set it via environment variable or secure configuration.");
 
 builder.Services.AddAuthentication(options =>
     {
@@ -33,48 +35,76 @@ builder.Services.AddAuthentication(options =>
     })
     .AddJwtBearer(options =>
     {
-        if (secretKey != null)
-            options.TokenValidationParameters = new TokenValidationParameters
-            {
-                ValidateIssuer = true,
-                ValidateAudience = true,
-                ValidateLifetime = true,
-                ValidateIssuerSigningKey = true,
-                ValidIssuer = jwtSettings["Issuer"],
-                ValidAudience = jwtSettings["Audience"],
-                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey)),
-                ClockSkew = TimeSpan.Zero
-            };
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = jwtSettings["Issuer"],
+            ValidAudience = jwtSettings["Audience"],
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey)),
+            ClockSkew = TimeSpan.Zero
+        };
     });
 
+// Политики авторизации
 builder.Services.AddAuthorization(options =>
 {
-    // 1. Простая ролевая политика
     options.AddPolicy("RequireAdminRole", policy => policy.RequireRole("Admin"));
-
-    // 2. Политика на подтверждение email (через claim)
     options.AddPolicy("EmailConfirmed", policy => policy.RequireClaim("IsEmailConfirmed", "True"));
-
-    // 3. Политика на возраст (кастомная)
-    options.AddPolicy("MinimumAge18", policy =>
-        policy.Requirements.Add(new MinimumAgeRequirement(18)));
-
-    // 4. Политика на право редактирования документа
-    options.AddPolicy("CanEditDocument", policy =>
-        policy.Requirements.Add(new PermissionRequirement("EditOwnDocuments", "EditAnyDocument")));
-
-    // 5. Политика на право удаления документа
-    options.AddPolicy("CanDeleteDocument", policy =>
-        policy.Requirements.Add(new PermissionRequirement("DeleteOwnDocuments", "DeleteAnyDocument")));
+    options.AddPolicy("MinimumAge18", policy => policy.Requirements.Add(new MinimumAgeRequirement(18)));
+    options.AddPolicy("CanEditDocument", policy => policy.Requirements.Add(new PermissionRequirement("EditOwnDocuments", "EditAnyDocument")));
+    options.AddPolicy("CanDeleteDocument", policy => policy.Requirements.Add(new PermissionRequirement("DeleteOwnDocuments", "DeleteAnyDocument")));
 });
 builder.Services.AddSingleton<IAuthorizationHandler, MinimumAgeHandler>();
 builder.Services.AddSingleton<IAuthorizationHandler, PermissionHandler>();
 
+// Настройка CORS
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("DefaultCors", policy =>
+    {
+        var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>();
+        if (allowedOrigins != null && allowedOrigins.Length > 0)
+        {
+            policy.WithOrigins(allowedOrigins)
+                  .AllowAnyMethod()
+                  .AllowAnyHeader()
+                  .AllowCredentials();
+        }
+        else
+        {
+            // Для разработки можно разрешить всё
+            policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader();
+        }
+    });
+});
+
+// Rate Limiting
+builder.Services.AddRateLimiter(options =>
+{
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(
+        httpContext => RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.User.Identity?.Name ?? httpContext.Request.Headers.Host.ToString(),
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                AutoReplenishment = true,
+                PermitLimit = 100,
+                QueueLimit = 0,
+                Window = TimeSpan.FromMinutes(1)
+            }));
+    options.OnRejected = async (context, token) =>
+    {
+        context.HttpContext.Response.StatusCode = 429;
+        await context.HttpContext.Response.WriteAsync("Too many requests. Please try again later.", token);
+    };
+});
 
 // Настройка OpenAPI (Scalar)
 builder.Services.AddOpenApi(options =>
 {
-    options.AddDocumentTransformer((document, _, _) => // неиспользуемые параметры заменены на _
+    options.AddDocumentTransformer((document, _, _) =>
     {
         document.Info = new OpenApiInfo
         {
@@ -106,14 +136,17 @@ else
     app.UseHsts(); // Защита в production
 }
 
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+});
+
 // Глобальный middleware для обработки исключений (должен быть до других middleware)
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 app.UseHttpsRedirection();
-
-
-// Простая настройка CORS (для разработки можно разрешить всё)
-app.UseCors(policy => policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
+app.UseCors("DefaultCors");
+app.UseRateLimiter();
 
 app.UseAuthentication();
 app.UseAuthorization();
