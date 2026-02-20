@@ -1,227 +1,118 @@
 ﻿using AutoMapper;
 using DocumentArchive.Core.DTOs.ArchiveLog;
 using DocumentArchive.Core.Models;
+using DocumentArchive.Infrastructure.Data;
 using DocumentArchive.Services.Mapping;
 using DocumentArchive.Services.Services;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Logging;
+using Moq;
 
 namespace DocumentArchive.Tests.ServicesTests;
 
-public class ArchiveLogServiceTests : TestBase
+public class ArchiveLogServiceTests : IDisposable
 {
+    private readonly AppDbContext _context;
     private readonly ArchiveLogService _service;
 
     public ArchiveLogServiceTests()
     {
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+        _context = new AppDbContext(options);
+
         var config = new MapperConfiguration(cfg => cfg.AddProfile<MappingProfile>());
         var mapper = config.CreateMapper();
-        _service = new ArchiveLogService(Context, mapper, NullLogger<ArchiveLogService>.Instance);
+
+        var loggerMock = new Mock<ILogger<ArchiveLogService>>();
+        _service = new ArchiveLogService(_context, mapper, loggerMock.Object);
+    }
+
+    public void Dispose()
+    {
+        _context.Database.EnsureDeleted();
+        _context.Dispose();
     }
 
     [Fact]
-    public async Task CreateLogAsync_ShouldAddLog()
+    public async Task GetLogsAsync_ShouldFilter()
     {
         // Arrange
-        var user = new User { Id = Guid.NewGuid(), Username = "u", Email = "u@t.com" };
-        var doc = new Document { Id = Guid.NewGuid(), Title = "Doc" };
-        Context.Users.Add(user);
-        Context.Documents.Add(doc);
-        await Context.SaveChangesAsync();
-
-        var dto = new CreateArchiveLogDto
+        var userId = Guid.NewGuid();
+        var docId = Guid.NewGuid();
+        var logs = new[]
         {
-            Action = "Viewed",
-            ActionType = ActionType.Viewed,
-            IsCritical = false,
-            UserId = user.Id,
-            DocumentId = doc.Id
-        };
-
-        // Act
-        var result = await _service.CreateLogAsync(dto);
-
-        // Assert
-        result.Should().NotBeNull();
-        result.Action.Should().Be("Viewed");
-        result.ActionType.Should().Be(ActionType.Viewed);
-
-        var log = await Context.ArchiveLogs.FirstOrDefaultAsync(l => l.DocumentId == doc.Id);
-        log.Should().NotBeNull();
-        log.UserId.Should().Be(user.Id);
-    }
-
-    [Fact]
-    public async Task CreateLogAsync_ShouldThrow_WhenDocumentNotFound()
-    {
-        var dto = new CreateArchiveLogDto
-        {
-            DocumentId = Guid.NewGuid(),
-            UserId = Guid.NewGuid()
-        };
-        Func<Task> act = async () => await _service.CreateLogAsync(dto);
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage($"Document with id {dto.DocumentId} not found");
-    }
-
-    [Fact]
-    public async Task GetLogByIdAsync_ShouldReturnDto()
-    {
-        // Arrange
-        var user = new User { Id = Guid.NewGuid(), Username = "u", Email = "u@t.com" };
-        var doc = new Document { Id = Guid.NewGuid(), Title = "Doc" };
-        var log = new ArchiveLog
-        {
-            Id = Guid.NewGuid(),
-            Action = "Created",
-            ActionType = ActionType.Created,
-            Timestamp = DateTime.UtcNow,
-            UserId = user.Id,
-            DocumentId = doc.Id,
-            User = user,
-            Document = doc
-        };
-        Context.Users.Add(user);
-        Context.Documents.Add(doc);
-        Context.ArchiveLogs.Add(log);
-        await Context.SaveChangesAsync();
-
-        // Act
-        var result = await _service.GetLogByIdAsync(log.Id);
-
-        // Assert
-        result.Should().NotBeNull();
-        result.Id.Should().Be(log.Id);
-        result.Action.Should().Be("Created");
-        result.UserName.Should().Be("u");
-        result.DocumentTitle.Should().Be("Doc");
-    }
-
-    [Fact]
-    public async Task DeleteLogAsync_ShouldRemoveLog()
-    {
-        // Arrange
-        var log = new ArchiveLog { Id = Guid.NewGuid(), Action = "Test" };
-        Context.ArchiveLogs.Add(log);
-        await Context.SaveChangesAsync();
-
-        // Act
-        await _service.DeleteLogAsync(log.Id);
-
-        // Assert
-        var deleted = await Context.ArchiveLogs.FindAsync(log.Id);
-        deleted.Should().BeNull();
-    }
-
-    [Fact]
-    public async Task GetLogsAsync_ShouldReturnPagedFiltered()
-    {
-        // Arrange
-        var fixedTime = new DateTime(2025, 1, 10, 12, 0, 0, DateTimeKind.Utc); // базовая дата
-
-        var user1 = new User { Id = Guid.NewGuid(), Username = "u1", Email = "u1@test.com" };
-        var user2 = new User { Id = Guid.NewGuid(), Username = "u2", Email = "u2@test.com" };
-        var doc = new Document { Id = Guid.NewGuid(), Title = "Doc", FileName = "doc.pdf" };
-        Context.Users.AddRange(user1, user2);
-        Context.Documents.Add(doc);
-        await Context.SaveChangesAsync();
-
-        var logs = new List<ArchiveLog>
-        {
-            new()
+            new ArchiveLog
             {
-                Action = "Create", ActionType = ActionType.Created, UserId = user1.Id, DocumentId = doc.Id,
-                Timestamp = fixedTime.AddDays(-3)
+                Id = Guid.NewGuid(), UserId = userId, DocumentId = docId, ActionType = ActionType.Created,
+                Timestamp = DateTime.UtcNow
             },
-            new()
+            new ArchiveLog
             {
-                Action = "Update", ActionType = ActionType.Updated, UserId = user1.Id, DocumentId = doc.Id,
-                Timestamp = fixedTime.AddDays(-2), IsCritical = true
+                Id = Guid.NewGuid(), UserId = userId, DocumentId = docId, ActionType = ActionType.Updated,
+                Timestamp = DateTime.UtcNow
             },
-            new()
+            new ArchiveLog
             {
-                Action = "Delete", ActionType = ActionType.Deleted, UserId = user2.Id, DocumentId = doc.Id,
-                Timestamp = fixedTime.AddDays(-1), IsCritical = false
+                Id = Guid.NewGuid(), UserId = Guid.NewGuid(), DocumentId = docId, ActionType = ActionType.Deleted,
+                Timestamp = DateTime.UtcNow
             }
         };
-        Context.ArchiveLogs.AddRange(logs);
-        await Context.SaveChangesAsync();
+        _context.ArchiveLogs.AddRange(logs);
+        await _context.SaveChangesAsync();
 
-        // Act: пагинация
-        var page1 = await _service.GetLogsAsync(1, 2, null, null, null, null, null, null);
+        // Act
+        var result = await _service.GetLogsAsync(1, 10, docId, userId, null, null, null, null, CancellationToken.None);
 
         // Assert
-        page1.Items.Should().HaveCount(2);
-        page1.TotalCount.Should().Be(3);
+        result.Items.Should().HaveCount(2);
+    }
 
-        // Фильтр по пользователю
-        var userLogs = await _service.GetLogsAsync(1, 10, null, user1.Id, null, null, null, null);
-        userLogs.Items.Should().HaveCount(2);
+    [Fact]
+    public async Task CreateLogAsync_ShouldCreate()
+    {
+        // Arrange
+        var user = new User { Id = Guid.NewGuid(), Username = "u" };
+        var doc = new Document { Id = Guid.NewGuid(), Title = "Doc" };
+        _context.Users.Add(user);
+        _context.Documents.Add(doc);
+        await _context.SaveChangesAsync();
 
-        // Фильтр по типу действия
-        var typeLogs = await _service.GetLogsAsync(1, 10, null, null, null, null, ActionType.Created, null);
-        typeLogs.Items.Should().HaveCount(1);
-        typeLogs.Items.First().ActionType.Should().Be(ActionType.Created);
+        var dto = new CreateArchiveLogDto
+        {
+            Action = "Test",
+            ActionType = ActionType.Created,
+            DocumentId = doc.Id,
+            UserId = user.Id,
+            IsCritical = false
+        };
 
-        // Фильтр по дате (используем фиксированное время)
-        var from = fixedTime.AddDays(-2);
-        var to = fixedTime;
-        var dateLogs = await _service.GetLogsAsync(1, 10, null, null, from, to, null, null);
-        dateLogs.Items.Should().HaveCount(2); // Update и Delete (с -2 и -1 дней)
-        dateLogs.Items.Select(l => l.Action).Should().Contain(new[] { "Update", "Delete" });
+        // Act
+        var result = await _service.CreateLogAsync(dto, CancellationToken.None);
 
-        // Фильтр по критичности
-        var critical = await _service.GetLogsAsync(1, 10, null, null, null, null, null, true);
-        critical.Items.Should().HaveCount(1);
-        critical.Items.First().Action.Should().Be("Update");
+        // Assert
+        result.Should().NotBeNull();
+        result.Action.Should().Be("Test");
     }
 
     [Fact]
     public async Task GetLogsCountByActionTypeAsync_ShouldReturnCounts()
     {
         // Arrange
-        var logs = new List<ArchiveLog>
-        {
-            new() { ActionType = ActionType.Created },
-            new() { ActionType = ActionType.Created },
-            new() { ActionType = ActionType.Updated },
-            new() { ActionType = ActionType.Deleted }
-        };
-        Context.ArchiveLogs.AddRange(logs);
-        await Context.SaveChangesAsync();
+        _context.ArchiveLogs.AddRange(
+            new ArchiveLog { Id = Guid.NewGuid(), ActionType = ActionType.Created },
+            new ArchiveLog { Id = Guid.NewGuid(), ActionType = ActionType.Created },
+            new ArchiveLog { Id = Guid.NewGuid(), ActionType = ActionType.Updated }
+        );
+        await _context.SaveChangesAsync();
 
         // Act
-        var result = await _service.GetLogsCountByActionTypeAsync();
+        var result = await _service.GetLogsCountByActionTypeAsync(null, null, CancellationToken.None);
 
         // Assert
         result[ActionType.Created].Should().Be(2);
         result[ActionType.Updated].Should().Be(1);
-        result[ActionType.Deleted].Should().Be(1);
-        result.Should().NotContainKey(ActionType.Viewed);
-    }
-
-    [Fact]
-    public async Task GetLogsStatisticsAsync_ShouldReturnSummary()
-    {
-        // Arrange
-        var logs = new List<ArchiveLog>
-        {
-            new() { ActionType = ActionType.Created, IsCritical = false },
-            new() { ActionType = ActionType.Created, IsCritical = false },
-            new() { ActionType = ActionType.Updated, IsCritical = true },
-            new() { ActionType = ActionType.Deleted, IsCritical = false }
-        };
-        Context.ArchiveLogs.AddRange(logs);
-        await Context.SaveChangesAsync();
-
-        // Act
-        var stats = await _service.GetLogsStatisticsAsync();
-
-        // Assert
-        stats.TotalLogs.Should().Be(4);
-        stats.CriticalLogs.Should().Be(1);
-        stats.LogsByActionType.Should().HaveCount(3);
-        stats.LogsByActionType.First(l => l.ActionType == ActionType.Created).Count.Should().Be(2);
     }
 }

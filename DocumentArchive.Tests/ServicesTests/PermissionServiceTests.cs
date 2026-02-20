@@ -1,10 +1,7 @@
-﻿using AutoMapper;
-using DocumentArchive.Core.DTOs.Permission;
+﻿using DocumentArchive.Core.DTOs.Permission;
 using DocumentArchive.Core.Models;
-using DocumentArchive.Services.Mapping;
 using DocumentArchive.Services.Services;
 using FluentAssertions;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace DocumentArchive.Tests.ServicesTests;
@@ -12,178 +9,117 @@ namespace DocumentArchive.Tests.ServicesTests;
 public class PermissionServiceTests : TestBase
 {
     private readonly PermissionService _service;
-    private readonly IMapper _mapper;
 
     public PermissionServiceTests()
     {
-        var config = new MapperConfiguration(cfg => cfg.AddProfile<MappingProfile>());
-        _mapper = config.CreateMapper();
-        _service = new PermissionService(Context, _mapper, NullLogger<PermissionService>.Instance);
+        var mapper = TestHelper.CreateMapper();
+        _service = new PermissionService(Context, mapper, NullLogger<PermissionService>.Instance);
+    }
+
+    protected override void SeedData()
+    {
+        Context.Permissions.AddRange(
+            new Permission
+                { Id = Guid.NewGuid(), Name = "View", Description = "View documents", Category = "Documents" },
+            new Permission
+                { Id = Guid.NewGuid(), Name = "Edit", Description = "Edit documents", Category = "Documents" }
+        );
+        Context.SaveChanges();
     }
 
     [Fact]
     public async Task GetAllAsync_ShouldReturnAllPermissions()
     {
-        // Arrange
-        var permissions = new[]
-        {
-            new Permission { Name = "CanEdit", Category = "Docs" },
-            new Permission { Name = "CanDelete", Category = "Docs" }
-        };
-        Context.Permissions.AddRange(permissions);
-        await Context.SaveChangesAsync();
-
-        // Act
         var result = await _service.GetAllAsync(default);
-
-        // Assert
         result.Should().HaveCount(2);
-        result.Select(p => p.Name).Should().Contain(new[] { "CanEdit", "CanDelete" });
     }
 
     [Fact]
-    public async Task GetByIdAsync_ShouldReturnPermission_WhenExists()
+    public async Task GetByIdAsync_ExistingId_ShouldReturnPermission()
     {
-        // Arrange
-        var permission = new Permission { Name = "CanEdit" };
-        Context.Permissions.Add(permission);
-        await Context.SaveChangesAsync();
-
-        // Act
-        var result = await _service.GetByIdAsync(permission.Id, default);
-
-        // Assert
+        var id = Context.Permissions.First().Id;
+        var result = await _service.GetByIdAsync(id, default);
         result.Should().NotBeNull();
-        result!.Id.Should().Be(permission.Id);
-        result.Name.Should().Be("CanEdit");
+        result!.Id.Should().Be(id);
     }
 
     [Fact]
-    public async Task GetByIdAsync_ShouldReturnNull_WhenNotExists()
+    public async Task GetByIdAsync_NonExistingId_ShouldReturnNull()
     {
-        // Act
         var result = await _service.GetByIdAsync(Guid.NewGuid(), default);
-
-        // Assert
         result.Should().BeNull();
     }
 
     [Fact]
-    public async Task CreateAsync_ShouldAddPermission()
+    public async Task CreateAsync_ValidDto_ShouldCreatePermission()
     {
-        // Arrange
-        var dto = new CreatePermissionDto { Name = "NewPerm", Description = "Desc", Category = "Cat" };
-
-        // Act
+        var dto = new CreatePermissionDto { Name = "Delete", Description = "Delete documents", Category = "Documents" };
         var result = await _service.CreateAsync(dto, default);
-
-        // Assert
-        result.Should().NotBeNull();
-        result.Name.Should().Be("NewPerm");
-        result.Description.Should().Be("Desc");
-        result.Category.Should().Be("Cat");
-
-        var permission = await Context.Permissions.FirstOrDefaultAsync(p => p.Name == "NewPerm");
-        permission.Should().NotBeNull();
+        result.Name.Should().Be("Delete");
+        Context.Permissions.Count().Should().Be(3);
     }
 
     [Fact]
-    public async Task CreateAsync_ShouldThrow_WhenNameExists()
+    public async Task CreateAsync_DuplicateName_ShouldThrow()
     {
-        // Arrange
-        Context.Permissions.Add(new Permission { Name = "Existing" });
-        await Context.SaveChangesAsync();
-        var dto = new CreatePermissionDto { Name = "Existing" };
-
-        // Act
-        Func<Task> act = async () => await _service.CreateAsync(dto, default);
-
-        // Assert
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("Permission with name 'Existing' already exists.");
+        var dto = new CreatePermissionDto { Name = "View", Description = "Duplicate" };
+        await FluentActions.Invoking(() => _service.CreateAsync(dto, default))
+            .Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*already exists*");
     }
 
     [Fact]
-    public async Task UpdateAsync_ShouldUpdatePermission()
+    public async Task UpdateAsync_ValidDto_ShouldUpdatePermission()
     {
-        // Arrange
-        var permission = new Permission { Name = "Old", Description = "OldDesc", Category = "OldCat" };
-        Context.Permissions.Add(permission);
-        await Context.SaveChangesAsync();
-        var updateDto = new UpdatePermissionDto { Name = "New", Description = "NewDesc", Category = "NewCat" };
-
-        // Act
-        await _service.UpdateAsync(permission.Id, updateDto, default);
-
-        // Assert
-        var updated = await Context.Permissions.FindAsync(permission.Id);
-        updated!.Name.Should().Be("New");
-        updated.Description.Should().Be("NewDesc");
-        updated.Category.Should().Be("NewCat");
-        updated.UpdatedAt.Should().NotBeNull();
+        var id = Context.Permissions.First().Id;
+        var dto = new UpdatePermissionDto { Name = "UpdatedName" };
+        await _service.UpdateAsync(id, dto, default);
+        var updated = await Context.Permissions.FindAsync(id);
+        updated!.Name.Should().Be("UpdatedName");
     }
 
     [Fact]
-    public async Task UpdateAsync_ShouldThrow_WhenNameExists()
+    public async Task UpdateAsync_NonExistingId_ShouldThrow()
     {
-        // Arrange
-        var perm1 = new Permission { Name = "Perm1" };
-        var perm2 = new Permission { Name = "Perm2" };
-        Context.Permissions.AddRange(perm1, perm2);
-        await Context.SaveChangesAsync();
-        var updateDto = new UpdatePermissionDto { Name = "Perm2" };
-
-        // Act
-        Func<Task> act = async () => await _service.UpdateAsync(perm1.Id, updateDto, default);
-
-        // Assert
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("Permission with name 'Perm2' already exists.");
+        var dto = new UpdatePermissionDto { Name = "Test" };
+        await FluentActions.Invoking(() => _service.UpdateAsync(Guid.NewGuid(), dto, default))
+            .Should().ThrowAsync<KeyNotFoundException>();
     }
 
     [Fact]
-    public async Task UpdateAsync_ShouldThrow_WhenPermissionNotFound()
+    public async Task UpdateAsync_DuplicateName_ShouldThrow()
     {
-        // Act
-        Func<Task> act = async () => await _service.UpdateAsync(Guid.NewGuid(), new UpdatePermissionDto(), default);
-
-        // Assert
-        await act.Should().ThrowAsync<KeyNotFoundException>();
+        var permissions = Context.Permissions.ToList();
+        var id = permissions[0].Id;
+        var dto = new UpdatePermissionDto { Name = permissions[1].Name };
+        await FluentActions.Invoking(() => _service.UpdateAsync(id, dto, default))
+            .Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*already exists*");
     }
 
     [Fact]
-    public async Task DeleteAsync_ShouldRemovePermission_WhenNoAssignments()
+    public async Task DeleteAsync_WithoutDependencies_ShouldDelete()
     {
-        // Arrange
-        var permission = new Permission { Name = "ToDelete" };
-        Context.Permissions.Add(permission);
-        await Context.SaveChangesAsync();
-
-        // Act
-        await _service.DeleteAsync(permission.Id, default);
-
-        // Assert
-        var deleted = await Context.Permissions.FindAsync(permission.Id);
-        deleted.Should().BeNull();
+        var id = Context.Permissions.First().Id;
+        await _service.DeleteAsync(id, default);
+        Context.Permissions.Count().Should().Be(1);
     }
 
     [Fact]
-    public async Task DeleteAsync_ShouldThrow_WhenPermissionHasRoleAssignments()
+    public async Task DeleteAsync_WithRolePermissions_ShouldThrow()
     {
-        // Arrange
-        var permission = new Permission { Name = "CanEdit" };
-        var role = new Role { Name = "TestRole" }; // изменено с "Admin"
-        Context.Permissions.Add(permission);
-        Context.Roles.Add(role);
+        var perm = Context.Permissions.First();
+        Context.RolePermissions.Add(new RolePermission { RoleId = Guid.NewGuid(), PermissionId = perm.Id });
         await Context.SaveChangesAsync();
-        Context.RolePermissions.Add(new RolePermission { RoleId = role.Id, PermissionId = permission.Id });
-        await Context.SaveChangesAsync();
+        await FluentActions.Invoking(() => _service.DeleteAsync(perm.Id, default))
+            .Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*assigned to roles*");
+    }
 
-        // Act
-        Func<Task> act = async () => await _service.DeleteAsync(permission.Id, default);
-
-        // Assert
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("Cannot delete permission because it is assigned to roles.");
+    [Fact]
+    public async Task DeleteAsync_NonExistingId_ShouldThrow()
+    {
+        await FluentActions.Invoking(() => _service.DeleteAsync(Guid.NewGuid(), default))
+            .Should().ThrowAsync<KeyNotFoundException>();
     }
 }

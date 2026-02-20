@@ -23,7 +23,6 @@ public class MappingProfile : Profile
             .ForMember(dest => dest.UpdatedAt, opt => opt.Ignore())
             .ForMember(dest => dest.User, opt => opt.Ignore())
             .ForMember(dest => dest.Category, opt => opt.Ignore())
-            // Игнорируем навигационные коллекции, которых нет в DTO
             .ForMember(dest => dest.Versions, opt => opt.Ignore())
             .ForMember(dest => dest.Logs, opt => opt.Ignore());
 
@@ -53,7 +52,6 @@ public class MappingProfile : Profile
             .ForMember(dest => dest.UserName,
                 opt => opt.MapFrom(src => src.User != null ? src.User.Username : null));
 
-
         CreateMap<Document, DocumentListItemDto>()
             .ForMember(dest => dest.CategoryName,
                 opt => opt.MapFrom(src => src.Category != null ? src.Category.Name : "Без категории"));
@@ -66,7 +64,8 @@ public class MappingProfile : Profile
             .ForMember(dest => dest.Documents, opt => opt.Ignore())
             .ForMember(dest => dest.Logs, opt => opt.Ignore())
             .ForMember(dest => dest.UserRoles, opt => opt.Ignore())
-            // Игнорируем все поля, которые есть в User, но отсутствуют в CreateUserDto
+            .ForMember(dest => dest.Sessions, opt => opt.Ignore())
+            .ForMember(dest => dest.UserClaims, opt => opt.Ignore())
             .ForMember(dest => dest.PasswordHash, opt => opt.Ignore())
             .ForMember(dest => dest.PasswordSalt, opt => opt.Ignore())
             .ForMember(dest => dest.FirstName, opt => opt.Ignore())
@@ -85,7 +84,8 @@ public class MappingProfile : Profile
             .ForMember(dest => dest.Documents, opt => opt.Ignore())
             .ForMember(dest => dest.Logs, opt => opt.Ignore())
             .ForMember(dest => dest.UserRoles, opt => opt.Ignore())
-            // Аналогично игнорируем поля, которых нет в UpdateUserDto
+            .ForMember(dest => dest.Sessions, opt => opt.Ignore())
+            .ForMember(dest => dest.UserClaims, opt => opt.Ignore())
             .ForMember(dest => dest.PasswordHash, opt => opt.Ignore())
             .ForMember(dest => dest.PasswordSalt, opt => opt.Ignore())
             .ForMember(dest => dest.FirstName, opt => opt.Ignore())
@@ -101,22 +101,20 @@ public class MappingProfile : Profile
         CreateMap<User, UserResponseDto>();
         CreateMap<User, UserListItemDto>();
 
-
-// ===== Category =====
+        // ===== Category =====
         CreateMap<CreateCategoryDto, Category>()
             .ForMember(dest => dest.Id, opt => opt.Ignore())
             .ForMember(dest => dest.CreatedAt, opt => opt.Ignore())
-            .ForMember(dest => dest.UpdatedAt, opt => opt.Ignore()) // явно игнорируем
+            .ForMember(dest => dest.UpdatedAt, opt => opt.Ignore())
             .ForMember(dest => dest.Documents, opt => opt.Ignore());
 
         CreateMap<UpdateCategoryDto, Category>()
             .ForMember(dest => dest.Id, opt => opt.Ignore())
             .ForMember(dest => dest.CreatedAt, opt => opt.Ignore())
-            .ForMember(dest => dest.UpdatedAt, opt => opt.Ignore()) // добавлено
+            .ForMember(dest => dest.UpdatedAt, opt => opt.Ignore())
             .ForMember(dest => dest.Documents, opt => opt.Ignore())
             .ForAllMembers(opts => opts.Condition((src, dest, srcMember) => srcMember != null));
 
-// Маппинги из модели в DTO
         CreateMap<Category, CategoryResponseDto>();
         CreateMap<Category, CategoryListItemDto>();
 
@@ -133,13 +131,11 @@ public class MappingProfile : Profile
             .ForMember(dest => dest.DocumentTitle,
                 opt => opt.MapFrom(src => src.Document != null ? src.Document.Title : null));
 
-
         CreateMap<ArchiveLog, ArchiveLogListItemDto>()
             .ForMember(dest => dest.UserName,
                 opt => opt.MapFrom(src => src.User != null ? src.User.Username : null));
 
-
-        // ===== Statistics DTOs (необязательные, для безопасности) =====
+        // ===== Statistics DTOs =====
         CreateMap<Category, CategoryWithDocumentCountDto>()
             .ForMember(dest => dest.DocumentsCount, opt => opt.Ignore());
 
@@ -166,16 +162,18 @@ public class MappingProfile : Profile
             .ForMember(dest => dest.CriticalLogs, opt => opt.Ignore())
             .ForMember(dest => dest.LogsByActionType, opt => opt.Ignore());
 
-        // Role mappings
+        // ===== Role mappings =====
         CreateMap<CreateRoleDto, Role>()
             .ForMember(dest => dest.Id, opt => opt.Ignore())
             .ForMember(dest => dest.CreatedAt, opt => opt.Ignore())
+            .ForMember(dest => dest.UpdatedAt, opt => opt.Ignore())
             .ForMember(dest => dest.UserRoles, opt => opt.Ignore())
             .ForMember(dest => dest.RolePermissions, opt => opt.Ignore());
 
         CreateMap<UpdateRoleDto, Role>()
             .ForMember(dest => dest.Id, opt => opt.Ignore())
             .ForMember(dest => dest.CreatedAt, opt => opt.Ignore())
+            .ForMember(dest => dest.UpdatedAt, opt => opt.Ignore())
             .ForMember(dest => dest.UserRoles, opt => opt.Ignore())
             .ForMember(dest => dest.RolePermissions, opt => opt.Ignore())
             .ForAllMembers(opts => opts.Condition((src, dest, srcMember) => srcMember != null));
@@ -183,25 +181,28 @@ public class MappingProfile : Profile
         CreateMap<Role, RoleResponseDto>();
         CreateMap<Role, RoleListItemDto>();
 
-// Permission mappings
+        // ===== Permission mappings =====
         CreateMap<CreatePermissionDto, Permission>()
             .ForMember(dest => dest.Id, opt => opt.Ignore())
             .ForMember(dest => dest.CreatedAt, opt => opt.Ignore())
+            .ForMember(dest => dest.UpdatedAt, opt => opt.Ignore())
             .ForMember(dest => dest.RolePermissions, opt => opt.Ignore());
 
         CreateMap<UpdatePermissionDto, Permission>()
             .ForMember(dest => dest.Id, opt => opt.Ignore())
             .ForMember(dest => dest.CreatedAt, opt => opt.Ignore())
+            .ForMember(dest => dest.UpdatedAt, opt => opt.Ignore())
             .ForMember(dest => dest.RolePermissions, opt => opt.Ignore())
             .ForAllMembers(opts => opts.Condition((src, dest, srcMember) => srcMember != null));
 
         CreateMap<Permission, PermissionResponseDto>();
         CreateMap<Permission, PermissionListItemDto>();
 
-// DocumentVersion mappings
+        // ===== DocumentVersion mappings =====
         CreateMap<CreateDocumentVersionDto, DocumentVersion>()
             .ForMember(dest => dest.Id, opt => opt.Ignore())
             .ForMember(dest => dest.UploadedAt, opt => opt.Ignore())
+            .ForMember(dest => dest.UpdatedAt, opt => opt.Ignore())
             .ForMember(dest => dest.Document, opt => opt.Ignore());
 
         CreateMap<UpdateDocumentVersionDto, DocumentVersion>()
@@ -212,8 +213,10 @@ public class MappingProfile : Profile
             .ForMember(dest => dest.FileSize, opt => opt.Ignore())
             .ForMember(dest => dest.UploadedAt, opt => opt.Ignore())
             .ForMember(dest => dest.UploadedBy, opt => opt.Ignore())
+            .ForMember(dest => dest.UpdatedAt, opt => opt.Ignore()) // <-- добавлено
             .ForMember(dest => dest.Document, opt => opt.Ignore())
             .ForAllMembers(opts => opts.Condition((src, dest, srcMember) => srcMember != null));
+
         CreateMap<RegisterDto, User>()
             .ForMember(dest => dest.Id, opt => opt.Ignore())
             .ForMember(dest => dest.CreatedAt, opt => opt.Ignore())
@@ -222,13 +225,14 @@ public class MappingProfile : Profile
             .ForMember(dest => dest.Logs, opt => opt.Ignore())
             .ForMember(dest => dest.UserRoles, opt => opt.Ignore())
             .ForMember(dest => dest.Sessions, opt => opt.Ignore())
-            // Поля, которые мы устанавливаем вручную в AuthService, игнорируем
+            .ForMember(dest => dest.UserClaims, opt => opt.Ignore())
             .ForMember(dest => dest.PasswordHash, opt => opt.Ignore())
             .ForMember(dest => dest.PasswordSalt, opt => opt.Ignore())
             .ForMember(dest => dest.LastLoginAt, opt => opt.Ignore())
             .ForMember(dest => dest.IsEmailConfirmed, opt => opt.Ignore())
             .ForMember(dest => dest.IsActive, opt => opt.Ignore())
             .ForMember(dest => dest.IsDeleted, opt => opt.Ignore());
+
         CreateMap<DocumentVersion, DocumentVersionResponseDto>();
         CreateMap<DocumentVersion, DocumentVersionListItemDto>();
     }

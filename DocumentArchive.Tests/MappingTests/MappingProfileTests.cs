@@ -1,7 +1,11 @@
 using AutoMapper;
 using DocumentArchive.Core.DTOs.ArchiveLog;
+using DocumentArchive.Core.DTOs.Auth;
 using DocumentArchive.Core.DTOs.Category;
 using DocumentArchive.Core.DTOs.Document;
+using DocumentArchive.Core.DTOs.DocumentVersion;
+using DocumentArchive.Core.DTOs.Permission;
+using DocumentArchive.Core.DTOs.Role;
 using DocumentArchive.Core.DTOs.User;
 using DocumentArchive.Core.Models;
 using DocumentArchive.Services.Mapping;
@@ -15,31 +19,22 @@ public class MappingProfileTests
 
     public MappingProfileTests()
     {
-        // Создаём конфигурацию ОДИН раз для всех тестов маппинга
-        var configuration = new MapperConfiguration(cfg =>
-        {
-            cfg.AddProfile<MappingProfile>();
-        });
+        var configuration = new MapperConfiguration(cfg => cfg.AddProfile<MappingProfile>());
         _mapper = configuration.CreateMapper();
     }
 
     [Fact]
     public void MappingProfile_Configuration_IsValid()
     {
-        // Создаём новую конфигурацию ТОЛЬКО для проверки валидности
-        var config = new MapperConfiguration(cfg =>
-        {
-            cfg.AddProfile<MappingProfile>();
-        });
-        
-        // Этот метод проверит, что все маппинги корректны и нет дубликатов
+        var config = new MapperConfiguration(cfg => cfg.AddProfile<MappingProfile>());
         config.AssertConfigurationIsValid();
     }
 
+    #region Document Mappings
+
     [Fact]
-    public void CreateDocumentDto_To_Document_Mapping()
+    public void CreateDocumentDto_To_Document_Mapping_ShouldMapCorrectly()
     {
-        // Arrange
         var dto = new CreateDocumentDto
         {
             Title = "Test Doc",
@@ -49,10 +44,8 @@ public class MappingProfileTests
             UserId = Guid.NewGuid()
         };
 
-        // Act
         var document = _mapper.Map<Document>(dto);
 
-        // Assert
         document.Title.Should().Be(dto.Title);
         document.Description.Should().Be(dto.Description);
         document.FileName.Should().Be(dto.FileName);
@@ -61,9 +54,8 @@ public class MappingProfileTests
     }
 
     [Fact]
-    public void UpdateDocumentDto_To_Document_Mapping()
+    public void UpdateDocumentDto_To_Document_Mapping_ShouldMapCorrectly()
     {
-        // Arrange
         var dto = new UpdateDocumentDto
         {
             Title = "Updated",
@@ -72,10 +64,8 @@ public class MappingProfileTests
             CategoryId = Guid.NewGuid()
         };
 
-        // Act
         var document = _mapper.Map<Document>(dto);
 
-        // Assert
         document.Title.Should().Be(dto.Title);
         document.Description.Should().Be(dto.Description);
         document.FileName.Should().Be(dto.FileName);
@@ -83,9 +73,8 @@ public class MappingProfileTests
     }
 
     [Fact]
-    public void UpdateBulkDocumentDto_To_Document_Mapping()
+    public void UpdateBulkDocumentDto_To_Document_Mapping_ShouldMapCorrectly()
     {
-        // Arrange
         var dto = new UpdateBulkDocumentDto
         {
             Id = Guid.NewGuid(),
@@ -95,10 +84,8 @@ public class MappingProfileTests
             CategoryId = Guid.NewGuid()
         };
 
-        // Act
         var document = _mapper.Map<Document>(dto);
 
-        // Assert
         document.Id.Should().Be(dto.Id);
         document.Title.Should().Be(dto.Title);
         document.Description.Should().Be(dto.Description);
@@ -107,9 +94,8 @@ public class MappingProfileTests
     }
 
     [Fact]
-    public void Document_To_DocumentResponseDto_Mapping()
+    public void Document_To_DocumentResponseDto_Mapping_ShouldMapCorrectly()
     {
-        // Arrange
         var category = new Category { Name = "Finance" };
         var user = new User { Username = "john" };
         var document = new Document
@@ -123,10 +109,8 @@ public class MappingProfileTests
             User = user
         };
 
-        // Act
         var dto = _mapper.Map<DocumentResponseDto>(document);
 
-        // Assert
         dto.Id.Should().Be(document.Id);
         dto.Title.Should().Be(document.Title);
         dto.Description.Should().Be(document.Description);
@@ -137,9 +121,8 @@ public class MappingProfileTests
     }
 
     [Fact]
-    public void Document_To_DocumentListItemDto_Mapping()
+    public void Document_To_DocumentListItemDto_Mapping_ShouldMapCorrectly()
     {
-        // Arrange
         var category = new Category { Name = "HR" };
         var document = new Document
         {
@@ -149,68 +132,69 @@ public class MappingProfileTests
             Category = category
         };
 
-        // Act
         var dto = _mapper.Map<DocumentListItemDto>(document);
 
-        // Assert
         dto.Id.Should().Be(document.Id);
         dto.Title.Should().Be(document.Title);
         dto.CategoryName.Should().Be("HR");
         dto.UploadDate.Should().Be(document.UploadDate);
     }
 
+    #endregion
+
+    #region User Mappings
+
     [Fact]
-    public void CreateUserDto_To_User_Mapping()
+    public void CreateUserDto_To_User_Mapping_ShouldMapCorrectly()
     {
-        // Arrange
         var dto = new CreateUserDto
         {
             Username = "testuser",
             Email = "test@example.com"
         };
 
-        // Act
         var user = _mapper.Map<User>(dto);
 
-        // Assert
         user.Username.Should().Be(dto.Username);
         user.Email.Should().Be(dto.Email);
+        // Поля, которые должны игнорироваться
+        user.PasswordHash.Should().BeNull();
+        user.FirstName.Should().BeNull();
+        user.LastName.Should().BeNull();
+        user.DateOfBirth.Should().BeNull();
+        user.PhoneNumber.Should().BeNull();
     }
 
     [Fact]
-    public void UpdateUserDto_To_User_Mapping()
+    public void UpdateUserDto_To_User_Mapping_ShouldMapCorrectly()
     {
-        // Arrange
         var dto = new UpdateUserDto
         {
             Username = "updated",
             Email = "updated@test.com"
         };
 
-        // Act
         var user = _mapper.Map<User>(dto);
 
-        // Assert
         user.Username.Should().Be(dto.Username);
         user.Email.Should().Be(dto.Email);
     }
 
     [Fact]
-    public void User_To_UserResponseDto_Mapping()
+    public void User_To_UserResponseDto_Mapping_ShouldMapCorrectly()
     {
-        // Arrange
         var user = new User
         {
             Id = Guid.NewGuid(),
             Username = "john",
             Email = "john@test.com",
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            FirstName = "John",
+            LastName = "Doe"
         };
 
-        // Act
         var dto = _mapper.Map<UserResponseDto>(user);
 
-        // Assert
         dto.Id.Should().Be(user.Id);
         dto.Username.Should().Be(user.Username);
         dto.Email.Should().Be(user.Email);
@@ -218,45 +202,89 @@ public class MappingProfileTests
     }
 
     [Fact]
-    public void CreateCategoryDto_To_Category_Mapping()
+    public void User_To_UserListItemDto_Mapping_ShouldMapCorrectly()
     {
-        // Arrange
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Username = "jane",
+            Email = "jane@test.com",
+            CreatedAt = DateTime.UtcNow
+        };
+
+        var dto = _mapper.Map<UserListItemDto>(user);
+
+        dto.Id.Should().Be(user.Id);
+        dto.Username.Should().Be(user.Username);
+        dto.Email.Should().Be(user.Email);
+    }
+
+    [Fact]
+    public void RegisterDto_To_User_Mapping_ShouldMapCorrectly()
+    {
+        var dto = new RegisterDto
+        {
+            Username = "newuser",
+            Email = "new@test.com",
+            FirstName = "New",
+            LastName = "User",
+            DateOfBirth = new DateTime(1990, 1, 1),
+            PhoneNumber = "+123456789"
+        };
+
+        var user = _mapper.Map<User>(dto);
+
+        user.Username.Should().Be(dto.Username);
+        user.Email.Should().Be(dto.Email);
+        user.FirstName.Should().Be(dto.FirstName);
+        user.LastName.Should().Be(dto.LastName);
+        user.DateOfBirth.Should().Be(dto.DateOfBirth);
+        user.PhoneNumber.Should().Be(dto.PhoneNumber);
+        // Поля, которые игнорируются при маппинге, остаются со значениями по умолчанию
+        user.PasswordHash.Should().BeNull();
+        user.LastLoginAt.Should().BeNull();
+        user.IsEmailConfirmed.Should().BeFalse(); // по умолчанию false
+        user.IsActive.Should().BeTrue(); // по умолчанию true в модели User
+        user.IsDeleted.Should().BeFalse();
+    }
+
+    #endregion
+
+    #region Category Mappings
+
+    [Fact]
+    public void CreateCategoryDto_To_Category_Mapping_ShouldMapCorrectly()
+    {
         var dto = new CreateCategoryDto
         {
             Name = "IT",
             Description = "Information Technology"
         };
 
-        // Act
         var category = _mapper.Map<Category>(dto);
 
-        // Assert
         category.Name.Should().Be(dto.Name);
         category.Description.Should().Be(dto.Description);
     }
 
     [Fact]
-    public void UpdateCategoryDto_To_Category_Mapping()
+    public void UpdateCategoryDto_To_Category_Mapping_ShouldMapCorrectly()
     {
-        // Arrange
         var dto = new UpdateCategoryDto
         {
             Name = "Updated",
             Description = "New description"
         };
 
-        // Act
         var category = _mapper.Map<Category>(dto);
 
-        // Assert
         category.Name.Should().Be(dto.Name);
         category.Description.Should().Be(dto.Description);
     }
 
     [Fact]
-    public void Category_To_CategoryResponseDto_Mapping()
+    public void Category_To_CategoryResponseDto_Mapping_ShouldMapCorrectly()
     {
-        // Arrange
         var category = new Category
         {
             Id = Guid.NewGuid(),
@@ -265,10 +293,8 @@ public class MappingProfileTests
             CreatedAt = DateTime.UtcNow
         };
 
-        // Act
         var dto = _mapper.Map<CategoryResponseDto>(category);
 
-        // Assert
         dto.Id.Should().Be(category.Id);
         dto.Name.Should().Be(category.Name);
         dto.Description.Should().Be(category.Description);
@@ -276,9 +302,28 @@ public class MappingProfileTests
     }
 
     [Fact]
-    public void CreateArchiveLogDto_To_ArchiveLog_Mapping()
+    public void Category_To_CategoryListItemDto_Mapping_ShouldMapCorrectly()
     {
-        // Arrange
+        var category = new Category
+        {
+            Id = Guid.NewGuid(),
+            Name = "HR",
+            CreatedAt = DateTime.UtcNow
+        };
+
+        var dto = _mapper.Map<CategoryListItemDto>(category);
+
+        dto.Id.Should().Be(category.Id);
+        dto.Name.Should().Be(category.Name);
+    }
+
+    #endregion
+
+    #region ArchiveLog Mappings
+
+    [Fact]
+    public void CreateArchiveLogDto_To_ArchiveLog_Mapping_ShouldMapCorrectly()
+    {
         var dto = new CreateArchiveLogDto
         {
             Action = "Created",
@@ -288,10 +333,8 @@ public class MappingProfileTests
             DocumentId = Guid.NewGuid()
         };
 
-        // Act
         var log = _mapper.Map<ArchiveLog>(dto);
 
-        // Assert
         log.Action.Should().Be(dto.Action);
         log.ActionType.Should().Be(dto.ActionType);
         log.IsCritical.Should().Be(dto.IsCritical);
@@ -300,9 +343,8 @@ public class MappingProfileTests
     }
 
     [Fact]
-    public void ArchiveLog_To_ArchiveLogResponseDto_Mapping()
+    public void ArchiveLog_To_ArchiveLogResponseDto_Mapping_ShouldMapCorrectly()
     {
-        // Arrange
         var user = new User { Username = "john" };
         var document = new Document { Title = "Report" };
         var log = new ArchiveLog
@@ -316,10 +358,8 @@ public class MappingProfileTests
             Document = document
         };
 
-        // Act
         var dto = _mapper.Map<ArchiveLogResponseDto>(log);
 
-        // Assert
         dto.Id.Should().Be(log.Id);
         dto.Action.Should().Be(log.Action);
         dto.ActionType.Should().Be(log.ActionType);
@@ -330,9 +370,8 @@ public class MappingProfileTests
     }
 
     [Fact]
-    public void ArchiveLog_To_ArchiveLogListItemDto_Mapping()
+    public void ArchiveLog_To_ArchiveLogListItemDto_Mapping_ShouldMapCorrectly()
     {
-        // Arrange
         var user = new User { Username = "alice" };
         var log = new ArchiveLog
         {
@@ -344,10 +383,8 @@ public class MappingProfileTests
             User = user
         };
 
-        // Act
         var dto = _mapper.Map<ArchiveLogListItemDto>(log);
 
-        // Assert
         dto.Id.Should().Be(log.Id);
         dto.Action.Should().Be(log.Action);
         dto.ActionType.Should().Be(log.ActionType);
@@ -355,4 +392,241 @@ public class MappingProfileTests
         dto.Timestamp.Should().Be(log.Timestamp);
         dto.UserName.Should().Be("alice");
     }
+
+    #endregion
+
+    #region Role Mappings
+
+    [Fact]
+    public void CreateRoleDto_To_Role_Mapping_ShouldMapCorrectly()
+    {
+        var dto = new CreateRoleDto
+        {
+            Name = "Admin",
+            Description = "Administrator role"
+        };
+
+        var role = _mapper.Map<Role>(dto);
+
+        role.Name.Should().Be(dto.Name);
+        role.Description.Should().Be(dto.Description);
+    }
+
+    [Fact]
+    public void UpdateRoleDto_To_Role_Mapping_ShouldMapCorrectly()
+    {
+        var dto = new UpdateRoleDto
+        {
+            Name = "Moderator",
+            Description = "Moderator role"
+        };
+
+        var role = _mapper.Map<Role>(dto);
+
+        role.Name.Should().Be(dto.Name);
+        role.Description.Should().Be(dto.Description);
+    }
+
+    [Fact]
+    public void Role_To_RoleResponseDto_Mapping_ShouldMapCorrectly()
+    {
+        var role = new Role
+        {
+            Id = Guid.NewGuid(),
+            Name = "User",
+            Description = "Regular user",
+            CreatedAt = DateTime.UtcNow
+        };
+
+        var dto = _mapper.Map<RoleResponseDto>(role);
+
+        dto.Id.Should().Be(role.Id);
+        dto.Name.Should().Be(role.Name);
+        dto.Description.Should().Be(role.Description);
+        dto.CreatedAt.Should().Be(role.CreatedAt);
+    }
+
+    [Fact]
+    public void Role_To_RoleListItemDto_Mapping_ShouldMapCorrectly()
+    {
+        var role = new Role
+        {
+            Id = Guid.NewGuid(),
+            Name = "Manager",
+            CreatedAt = DateTime.UtcNow
+        };
+
+        var dto = _mapper.Map<RoleListItemDto>(role);
+
+        dto.Id.Should().Be(role.Id);
+        dto.Name.Should().Be(role.Name);
+    }
+
+    #endregion
+
+    #region Permission Mappings
+
+    [Fact]
+    public void CreatePermissionDto_To_Permission_Mapping_ShouldMapCorrectly()
+    {
+        var dto = new CreatePermissionDto
+        {
+            Name = "Edit",
+            Description = "Edit documents",
+            Category = "Documents"
+        };
+
+        var permission = _mapper.Map<Permission>(dto);
+
+        permission.Name.Should().Be(dto.Name);
+        permission.Description.Should().Be(dto.Description);
+        permission.Category.Should().Be(dto.Category);
+    }
+
+    [Fact]
+    public void UpdatePermissionDto_To_Permission_Mapping_ShouldMapCorrectly()
+    {
+        var dto = new UpdatePermissionDto
+        {
+            Name = "Delete",
+            Description = "Delete documents",
+            Category = "Admin"
+        };
+
+        var permission = _mapper.Map<Permission>(dto);
+
+        permission.Name.Should().Be(dto.Name);
+        permission.Description.Should().Be(dto.Description);
+        permission.Category.Should().Be(dto.Category);
+    }
+
+    [Fact]
+    public void Permission_To_PermissionResponseDto_Mapping_ShouldMapCorrectly()
+    {
+        var permission = new Permission
+        {
+            Id = Guid.NewGuid(),
+            Name = "View",
+            Description = "View documents",
+            Category = "Documents",
+            CreatedAt = DateTime.UtcNow
+        };
+
+        var dto = _mapper.Map<PermissionResponseDto>(permission);
+
+        dto.Id.Should().Be(permission.Id);
+        dto.Name.Should().Be(permission.Name);
+        dto.Description.Should().Be(permission.Description);
+        dto.Category.Should().Be(permission.Category);
+        dto.CreatedAt.Should().Be(permission.CreatedAt);
+    }
+
+    [Fact]
+    public void Permission_To_PermissionListItemDto_Mapping_ShouldMapCorrectly()
+    {
+        var permission = new Permission
+        {
+            Id = Guid.NewGuid(),
+            Name = "Upload",
+            Category = "Documents",
+            CreatedAt = DateTime.UtcNow
+        };
+
+        var dto = _mapper.Map<PermissionListItemDto>(permission);
+
+        dto.Id.Should().Be(permission.Id);
+        dto.Name.Should().Be(permission.Name);
+        dto.Category.Should().Be(permission.Category);
+    }
+
+    #endregion
+
+    #region DocumentVersion Mappings
+
+    [Fact]
+    public void CreateDocumentVersionDto_To_DocumentVersion_Mapping_ShouldMapCorrectly()
+    {
+        var dto = new CreateDocumentVersionDto
+        {
+            DocumentId = Guid.NewGuid(),
+            VersionNumber = 2,
+            FileName = "v2.pdf",
+            FileSize = 2048,
+            Comment = "Second version"
+        };
+
+        var version = _mapper.Map<DocumentVersion>(dto);
+
+        version.DocumentId.Should().Be(dto.DocumentId);
+        version.VersionNumber.Should().Be(dto.VersionNumber);
+        version.FileName.Should().Be(dto.FileName);
+        version.FileSize.Should().Be(dto.FileSize);
+        version.Comment.Should().Be(dto.Comment);
+    }
+
+    [Fact]
+    public void UpdateDocumentVersionDto_To_DocumentVersion_Mapping_ShouldMapCorrectly()
+    {
+        var dto = new UpdateDocumentVersionDto
+        {
+            Comment = "Updated comment"
+        };
+
+        var version = _mapper.Map<DocumentVersion>(dto);
+
+        version.Comment.Should().Be(dto.Comment);
+        // Другие поля игнорируются
+    }
+
+    [Fact]
+    public void DocumentVersion_To_DocumentVersionResponseDto_Mapping_ShouldMapCorrectly()
+    {
+        var doc = new Document { Title = "Doc" };
+        var version = new DocumentVersion
+        {
+            Id = Guid.NewGuid(),
+            DocumentId = doc.Id,
+            VersionNumber = 1,
+            FileName = "v1.pdf",
+            FileSize = 1024,
+            Comment = "Initial",
+            UploadedAt = DateTime.UtcNow,
+            UploadedBy = Guid.NewGuid(),
+            Document = doc
+        };
+
+        var dto = _mapper.Map<DocumentVersionResponseDto>(version);
+
+        dto.Id.Should().Be(version.Id);
+        dto.DocumentId.Should().Be(version.DocumentId);
+        dto.VersionNumber.Should().Be(version.VersionNumber);
+        dto.FileName.Should().Be(version.FileName);
+        dto.FileSize.Should().Be(version.FileSize);
+        dto.Comment.Should().Be(version.Comment);
+        dto.UploadedAt.Should().Be(version.UploadedAt);
+        dto.UploadedBy.Should().Be(version.UploadedBy);
+    }
+
+    [Fact]
+    public void DocumentVersion_To_DocumentVersionListItemDto_Mapping_ShouldMapCorrectly()
+    {
+        var version = new DocumentVersion
+        {
+            Id = Guid.NewGuid(),
+            DocumentId = Guid.NewGuid(),
+            VersionNumber = 3,
+            FileName = "v3.pdf",
+            UploadedAt = DateTime.UtcNow,
+            UploadedBy = Guid.NewGuid()
+        };
+
+        var dto = _mapper.Map<DocumentVersionListItemDto>(version);
+
+        dto.Id.Should().Be(version.Id);
+        dto.VersionNumber.Should().Be(version.VersionNumber);
+        dto.FileName.Should().Be(version.FileName);
+        dto.UploadedAt.Should().Be(version.UploadedAt);
+    }
+
+    #endregion
 }
