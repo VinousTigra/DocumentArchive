@@ -65,7 +65,7 @@ builder.Services.AddOpenApi(options =>
         };
         return Task.CompletedTask;
     });
-   // options.AddDocumentTransformer<BearerSecuritySchemeTransformer>();
+    options.AddDocumentTransformer<BearerSecuritySchemeTransformer>();
 });
 
 var app = builder.Build();
@@ -87,8 +87,12 @@ app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 app.UseHttpsRedirection();
 
+
 // Простая настройка CORS (для разработки можно разрешить всё)
 app.UseCors(policy => policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
+
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapControllers();
 

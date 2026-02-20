@@ -5,9 +5,9 @@ namespace DocumentArchive.API.Middleware;
 
 public class ExceptionHandlingMiddleware
 {
-    private readonly RequestDelegate _next;
-    private readonly ILogger<ExceptionHandlingMiddleware> _logger;
     private readonly IWebHostEnvironment _env;
+    private readonly ILogger<ExceptionHandlingMiddleware> _logger;
+    private readonly RequestDelegate _next;
 
     public ExceptionHandlingMiddleware(
         RequestDelegate next,
@@ -40,6 +40,11 @@ public class ExceptionHandlingMiddleware
         {
             _logger.LogWarning(ex, "Business rule violation");
             await WriteProblemDetailsAsync(context, StatusCodes.Status400BadRequest, "Bad Request", ex.Message);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            _logger.LogWarning(ex, "Unauthorized access");
+            await WriteProblemDetailsAsync(context, StatusCodes.Status401Unauthorized, "Unauthorized", ex.Message);
         }
         catch (Exception ex)
         {
