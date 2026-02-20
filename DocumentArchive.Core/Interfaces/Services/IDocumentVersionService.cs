@@ -4,14 +4,17 @@ namespace DocumentArchive.Core.Interfaces.Services;
 
 public interface IDocumentVersionService
 {
-    Task<List<DocumentVersionListItemDto>> GetAllAsync(Guid? documentId = null,
-        CancellationToken cancellationToken = default);
+    Task<List<DocumentVersionListItemDto>> GetAllAsync(Guid? documentId, Guid currentUserId, List<string> permissions,
+        CancellationToken cancellationToken);
 
-    Task<DocumentVersionResponseDto?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<DocumentVersionResponseDto?> GetByIdAsync(Guid id, Guid currentUserId, List<string> permissions,
+        CancellationToken cancellationToken);
 
-    Task<DocumentVersionResponseDto> CreateAsync(CreateDocumentVersionDto dto,
-        CancellationToken cancellationToken = default);
+    Task<DocumentVersionResponseDto> CreateAsync(CreateDocumentVersionDto dto, Guid currentUserId,
+        CancellationToken cancellationToken); // создание доступно владельцу или админу
 
-    Task UpdateAsync(Guid id, UpdateDocumentVersionDto dto, CancellationToken cancellationToken = default);
-    Task DeleteAsync(Guid id, CancellationToken cancellationToken = default);
+    Task UpdateAsync(Guid id, UpdateDocumentVersionDto dto, Guid currentUserId, List<string> permissions,
+        CancellationToken cancellationToken);
+
+    Task DeleteAsync(Guid id, Guid currentUserId, List<string> permissions, CancellationToken cancellationToken);
 }
