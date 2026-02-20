@@ -10,8 +10,8 @@ public interface IDocumentVersionService
     Task<DocumentVersionResponseDto?> GetByIdAsync(Guid id, Guid currentUserId, List<string> permissions,
         CancellationToken cancellationToken);
 
-    Task<DocumentVersionResponseDto> CreateAsync(CreateDocumentVersionDto dto, Guid currentUserId,
-        CancellationToken cancellationToken); // создание доступно владельцу или админу
+    Task<DocumentVersionResponseDto> CreateAsync(CreateDocumentVersionDto dto, Guid currentUserId, List<string> permissions,
+        CancellationToken cancellationToken);
 
     Task UpdateAsync(Guid id, UpdateDocumentVersionDto dto, Guid currentUserId, List<string> permissions,
         CancellationToken cancellationToken);

@@ -109,50 +109,6 @@ public class DocumentVersionService : IDocumentVersionService
         return _mapper.Map<DocumentVersionResponseDto>(version);
     }
 
-    public async Task<DocumentVersionResponseDto> CreateAsync(CreateDocumentVersionDto dto, Guid currentUserId, CancellationToken cancellationToken)
-    {
-        // Проверяем существование документа
-        var document = await _context.Documents
-            .FirstOrDefaultAsync(d => d.Id == dto.DocumentId, cancellationToken);
-        if (document == null)
-            throw new InvalidOperationException($"Document with id {dto.DocumentId} not found.");
-
-        // Проверяем, может ли пользователь добавлять версии к этому документу (нужно право EditOwnDocuments или EditAnyDocument)
-        var permissions = new List<string>(); // здесь у нас нет permissions, но в реальном методе они передаются.
-        // В сигнатуре CreateAsync нет permissions, поэтому будем считать, что создание версии доступно владельцу или админу.
-        // Для этого нужно передать permissions, изменим интерфейс.
-        // Пока оставим как есть, но позже нужно будет добавить параметр permissions.
-        // Сейчас просто проверим через документ: если пользователь не владелец и не админ, то запретим.
-        // Для этого нам нужно знать, является ли пользователь админом – но permissions не переданы.
-        // В целях безопасности, пока сделаем так: если пользователь не владелец, то запрещаем.
-        // В реальности нужно изменить интерфейс.
-        // Но мы можем получить права из текущего контекста? Нет.
-        // Поэтому предлагаю временно добавить permissions в сигнатуру CreateAsync.
-        // Для согласованности с интерфейсом, который мы ранее описали, нужно добавить параметр.
-        // Я покажу с добавлением permissions.
-
-        // Пока используем упрощённую проверку (только владелец)
-        if (document.UserId != currentUserId)
-            throw new UnauthorizedAccessException("You do not have permission to add versions to this document");
-
-        // Проверка уникальности номера версии
-        var versionExists = await _context.DocumentVersions
-            .AnyAsync(v => v.DocumentId == dto.DocumentId && v.VersionNumber == dto.VersionNumber, cancellationToken);
-        if (versionExists)
-            throw new InvalidOperationException($"Version number {dto.VersionNumber} already exists for this document.");
-
-        var version = _mapper.Map<DocumentVersion>(dto);
-        version.Id = Guid.NewGuid();
-        version.UploadedAt = DateTime.UtcNow;
-        version.UploadedBy = currentUserId;
-
-        _context.DocumentVersions.Add(version);
-        await _context.SaveChangesAsync(cancellationToken);
-
-        _logger.LogInformation("Document version {VersionId} created for document {DocumentId} by user {UserId}", version.Id, dto.DocumentId, currentUserId);
-        return _mapper.Map<DocumentVersionResponseDto>(version);
-    }
-
     // Если мы решили добавить permissions в интерфейс, то метод будет выглядеть так:
     public async Task<DocumentVersionResponseDto> CreateAsync(CreateDocumentVersionDto dto, Guid currentUserId, List<string> permissions, CancellationToken cancellationToken)
     {

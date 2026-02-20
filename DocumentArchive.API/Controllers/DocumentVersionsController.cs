@@ -65,7 +65,9 @@ public class DocumentVersionsController : ControllerBase
         CancellationToken cancellationToken)
     {
         var currentUserId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty);
-        var version = await _documentVersionService.CreateAsync(dto, currentUserId, cancellationToken);
+        var permissions = User.Claims.Where(c => c.Type == "permission").Select(c => c.Value).ToList();
+
+        var version = await _documentVersionService.CreateAsync(dto, currentUserId, permissions, cancellationToken);
         return CreatedAtAction(nameof(GetById), new { id = version.Id }, version);
     }
 
