@@ -65,7 +65,6 @@ public class DocumentService : IDocumentService
             .AsNoTracking()
             .AsQueryable();
 
-        // Фильтрация по поиску
         if (!string.IsNullOrWhiteSpace(search))
         {
             query = query.Where(d => d.Title.Contains(search) ||
@@ -82,18 +81,15 @@ public class DocumentService : IDocumentService
         if (toDate.HasValue)
             query = query.Where(d => d.UploadDate <= toDate.Value);
 
-        // Ограничение по правам: если нет права ViewAnyDocument, показываем только свои
         if (!permissions.Contains("ViewAnyDocument"))
         {
             query = query.Where(d => d.UserId == currentUserId);
         }
         else if (userId.HasValue)
         {
-            // Если админ явно указал userId, фильтруем по нему
             query = query.Where(d => d.UserId == userId.Value);
         }
 
-        // Сортировка
         query = ApplySorting(query, sort);
 
         var totalCount = await query.CountAsync(cancellationToken);
@@ -118,7 +114,6 @@ public class DocumentService : IDocumentService
         if (string.IsNullOrWhiteSpace(sort))
             return query.OrderByDescending(d => d.UploadDate);
 
-        // Пример: "title:asc,uploaddate:desc"
         var fields = sort.Split(',');
         IOrderedQueryable<Document>? orderedQuery = null;
 
@@ -165,14 +160,13 @@ public class DocumentService : IDocumentService
             return null;
 
         if (!CanViewDocument(document, currentUserId, permissions))
-            return null; // пользователь не имеет права видеть этот документ
+            return null;
 
         return _mapper.Map<DocumentResponseDto>(document);
     }
 
     public async Task<DocumentResponseDto> CreateDocumentAsync(CreateDocumentDto createDto, Guid currentUserId, CancellationToken cancellationToken = default)
     {
-        // Проверка существования категории, если указана
         if (createDto.CategoryId.HasValue)
         {
             var categoryExists = await _context.Categories.AnyAsync(c => c.Id == createDto.CategoryId.Value, cancellationToken);
@@ -182,12 +176,11 @@ public class DocumentService : IDocumentService
 
         var document = _mapper.Map<Document>(createDto);
         document.Id = Guid.NewGuid();
-        document.UserId = currentUserId; // принудительно устанавливаем владельца
+        document.UserId = currentUserId;
         document.UploadDate = DateTime.UtcNow;
 
         _context.Documents.Add(document);
 
-        // Создаём запись в логе
         var log = new ArchiveLog
         {
             Id = Guid.NewGuid(),
@@ -226,6 +219,18 @@ public class DocumentService : IDocumentService
         _mapper.Map(updateDto, document);
         document.UpdatedAt = DateTime.UtcNow;
 
+        var log = new ArchiveLog
+        {
+            Id = Guid.NewGuid(),
+            Action = "Updated",
+            ActionType = ActionType.Updated,
+            IsCritical = false,
+            Timestamp = DateTime.UtcNow,
+            UserId = currentUserId,
+            DocumentId = document.Id
+        };
+        _context.ArchiveLogs.Add(log);
+
         await _context.SaveChangesAsync(cancellationToken);
         _logger.LogInformation("Document {DocumentId} updated by user {UserId}", id, currentUserId);
     }
@@ -239,6 +244,18 @@ public class DocumentService : IDocumentService
 
         if (!CanDeleteDocument(document, currentUserId, permissions))
             throw new UnauthorizedAccessException("You do not have permission to delete this document");
+
+        var log = new ArchiveLog
+        {
+            Id = Guid.NewGuid(),
+            Action = "Deleted",
+            ActionType = ActionType.Deleted,
+            IsCritical = false,
+            Timestamp = DateTime.UtcNow,
+            UserId = currentUserId,
+            DocumentId = document.Id
+        };
+        _context.ArchiveLogs.Add(log);
 
         _context.Documents.Remove(document);
         await _context.SaveChangesAsync(cancellationToken);
@@ -284,7 +301,6 @@ public class DocumentService : IDocumentService
         };
     }
 
-    // Bulk операции (упрощённо, с проверками прав для каждого документа)
     public async Task<BulkOperationResult<Guid>> CreateBulkAsync(IEnumerable<CreateDocumentDto> createDtos, Guid currentUserId, List<string> permissions, CancellationToken cancellationToken = default)
     {
         var result = new BulkOperationResult<Guid>();
@@ -295,7 +311,6 @@ public class DocumentService : IDocumentService
             {
                 try
                 {
-                    // Внутри CreateDocumentInternalAsync уже есть проверки на существование категории
                     var doc = await CreateDocumentInternalAsync(dto, currentUserId, cancellationToken);
                     result.Results.Add(new BulkOperationItem<Guid> { Id = doc.Id, Success = true });
                 }
@@ -395,6 +410,18 @@ public class DocumentService : IDocumentService
 
         _mapper.Map(dto, document);
         document.UpdatedAt = DateTime.UtcNow;
+
+        var log = new ArchiveLog
+        {
+            Id = Guid.NewGuid(),
+            Action = "Updated",
+            ActionType = ActionType.Updated,
+            IsCritical = false,
+            Timestamp = DateTime.UtcNow,
+            UserId = currentUserId,
+            DocumentId = document.Id
+        };
+        _context.ArchiveLogs.Add(log);
     }
 
     public async Task<BulkOperationResult<Guid>> DeleteBulkAsync(IEnumerable<Guid> ids, Guid currentUserId, List<string> permissions, CancellationToken cancellationToken = default)
@@ -414,6 +441,18 @@ public class DocumentService : IDocumentService
 
                     if (!CanDeleteDocument(document, currentUserId, permissions))
                         throw new UnauthorizedAccessException($"You do not have permission to delete document {id}");
+
+                    var log = new ArchiveLog
+                    {
+                        Id = Guid.NewGuid(),
+                        Action = "Deleted",
+                        ActionType = ActionType.Deleted,
+                        IsCritical = false,
+                        Timestamp = DateTime.UtcNow,
+                        UserId = currentUserId,
+                        DocumentId = document.Id
+                    };
+                    _context.ArchiveLogs.Add(log);
 
                     _context.Documents.Remove(document);
                     result.Results.Add(new BulkOperationItem<Guid> { Id = id, Success = true });
@@ -435,7 +474,6 @@ public class DocumentService : IDocumentService
         return result;
     }
 
-    // Статистические методы (доступны всем, но можно ограничить по ролям)
     public async Task<Dictionary<string, int>> GetDocumentsCountByCategoryAsync(CancellationToken cancellationToken = default)
     {
         return await _context.Documents

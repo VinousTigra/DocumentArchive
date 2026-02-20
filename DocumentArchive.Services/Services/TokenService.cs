@@ -28,7 +28,7 @@ public class TokenService : ITokenService
     public string GenerateAccessToken(User user, IList<string> roles, IList<string> permissions)
     {
         var jwtSettings = _configuration.GetSection("JwtSettings");
-        var secretKey = jwtSettings["SecretKey"];
+        var secretKey = jwtSettings["SecretKey"] ?? throw new InvalidOperationException("JWT SecretKey is not configured.");
         var issuer = jwtSettings["Issuer"];
         var audience = jwtSettings["Audience"];
         var expirationMinutes = int.Parse(jwtSettings["AccessTokenExpirationMinutes"] ?? "15");
@@ -43,15 +43,14 @@ public class TokenService : ITokenService
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
 
+        if (user.DateOfBirth.HasValue)
+            claims.Add(new Claim("DateOfBirth", user.DateOfBirth.Value.ToString("yyyy-MM-dd")));
+
         foreach (var role in roles)
             claims.Add(new Claim(ClaimTypes.Role, role));
 
         foreach (var permission in permissions)
             claims.Add(new Claim("permission", permission));
-
-        secretKey = jwtSettings["SecretKey"];
-        if (string.IsNullOrEmpty(secretKey))
-            throw new InvalidOperationException("JWT SecretKey is not configured.");
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
@@ -62,9 +61,6 @@ public class TokenService : ITokenService
             claims,
             expires: DateTime.UtcNow.AddMinutes(expirationMinutes),
             signingCredentials: creds);
-
-        if (user.DateOfBirth.HasValue)
-            claims.Add(new Claim("DateOfBirth", user.DateOfBirth.Value.ToString("yyyy-MM-dd")));
 
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
@@ -145,7 +141,6 @@ public class TokenService : ITokenService
         {
             rng.GetBytes(randomBytes);
         }
-
         return Convert.ToBase64String(randomBytes);
     }
 }
