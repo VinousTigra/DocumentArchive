@@ -23,6 +23,7 @@ public class AppDbContext : DbContext
     public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
     public DbSet<EmailConfirmationToken> EmailConfirmationTokens => Set<EmailConfirmationToken>();
     public DbSet<SecurityAuditLog> SecurityAuditLogs => Set<SecurityAuditLog>();
+    public DbSet<UserClaim> UserClaims => Set<UserClaim>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -123,6 +124,9 @@ public class AppDbContext : DbContext
                 .WithMany(r => r.UserRoles)
                 .HasForeignKey(ur => ur.RoleId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            entity.Property(ur => ur.AssignedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
         });
 
         // Настройка сущности RolePermission (связь many-to-many между Role и Permission)
@@ -389,6 +393,21 @@ public class AppDbContext : DbContext
             entity.HasIndex(e => e.Timestamp);
         });
 
+
+        modelBuilder.Entity<UserClaim>(entity =>
+        {
+            entity.HasKey(uc => uc.Id);
+            entity.Property(uc => uc.ClaimType).IsRequired().HasMaxLength(100);
+            entity.Property(uc => uc.ClaimValue).IsRequired().HasMaxLength(500);
+            entity.Property(uc => uc.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.HasOne(uc => uc.User)
+                .WithMany(u => u.UserClaims) // добавьте навигацию в User
+                .HasForeignKey(uc => uc.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(uc => uc.ClaimType);
+        });
 
         base.OnModelCreating(modelBuilder);
     }

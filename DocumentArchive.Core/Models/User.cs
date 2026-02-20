@@ -26,4 +26,6 @@ public class User
     public ICollection<ArchiveLog> Logs { get; set; } = new List<ArchiveLog>();
     public ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
     public ICollection<UserSession> Sessions { get; set; } = new List<UserSession>();
+
+    public ICollection<UserClaim> UserClaims { get; set; } = new List<UserClaim>();
 }
