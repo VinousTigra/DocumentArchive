@@ -6,6 +6,7 @@ using DocumentArchive.Core.Interfaces.Services;
 using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace DocumentArchive.API.Controllers;
 
@@ -58,8 +59,12 @@ public class DocumentsController : ControllerBase
             return BadRequest(
                 "Invalid sort format. Expected format: field:direction,field:direction (e.g., title:asc,uploadDate:desc)");
 
+        var currentUserId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty);
+        var permissions = User.Claims.Where(c => c.Type == "permission").Select(c => c.Value).ToList();
+
         var result = await _documentService.GetDocumentsAsync(
-            page, pageSize, search, categoryIds, userId, fromDate, toDate, sort, cancellationToken);
+            page, pageSize, search, categoryIds, userId, fromDate, toDate, sort,
+            currentUserId, permissions, cancellationToken);
         return Ok(result);
     }
 
@@ -72,7 +77,10 @@ public class DocumentsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<DocumentResponseDto>> GetById(Guid id, CancellationToken cancellationToken = default)
     {
-        var document = await _documentService.GetDocumentByIdAsync(id, cancellationToken);
+        var currentUserId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty);
+        var permissions = User.Claims.Where(c => c.Type == "permission").Select(c => c.Value).ToList();
+
+        var document = await _documentService.GetDocumentByIdAsync(id, currentUserId, permissions, cancellationToken);
         if (document == null)
             return NotFound();
         return Ok(document);
@@ -92,7 +100,8 @@ public class DocumentsController : ControllerBase
         if (!validationResult.IsValid)
             return BadRequest(validationResult.Errors);
 
-        var result = await _documentService.CreateDocumentAsync(createDto, cancellationToken);
+        var currentUserId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty);
+        var result = await _documentService.CreateDocumentAsync(createDto, currentUserId, cancellationToken);
         return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
     }
 
@@ -111,7 +120,10 @@ public class DocumentsController : ControllerBase
         if (!validationResult.IsValid)
             return BadRequest(validationResult.Errors);
 
-        await _documentService.UpdateDocumentAsync(id, updateDto, cancellationToken);
+        var currentUserId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty);
+        var permissions = User.Claims.Where(c => c.Type == "permission").Select(c => c.Value).ToList();
+
+        await _documentService.UpdateDocumentAsync(id, updateDto, currentUserId, permissions, cancellationToken);
         return NoContent();
     }
 
@@ -124,7 +136,10 @@ public class DocumentsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken = default)
     {
-        await _documentService.DeleteDocumentAsync(id, cancellationToken);
+        var currentUserId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty);
+        var permissions = User.Claims.Where(c => c.Type == "permission").Select(c => c.Value).ToList();
+
+        await _documentService.DeleteDocumentAsync(id, currentUserId, permissions, cancellationToken);
         return NoContent();
     }
 
@@ -147,7 +162,10 @@ public class DocumentsController : ControllerBase
         if (pageSize < 1 || pageSize > 100)
             return BadRequest("Page size must be between 1 and 100.");
 
-        var result = await _documentService.GetDocumentLogsAsync(id, page, pageSize, cancellationToken);
+        var currentUserId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty);
+        var permissions = User.Claims.Where(c => c.Type == "permission").Select(c => c.Value).ToList();
+
+        var result = await _documentService.GetDocumentLogsAsync(id, page, pageSize, currentUserId, permissions, cancellationToken);
         return Ok(result);
     }
 
@@ -167,7 +185,10 @@ public class DocumentsController : ControllerBase
         if (createDtos.Count > MaxBulkSize)
             return BadRequest($"Too many items in bulk request. Maximum allowed: {MaxBulkSize}.");
 
-        var result = await _documentService.CreateBulkAsync(createDtos, cancellationToken);
+        var currentUserId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty);
+        var permissions = User.Claims.Where(c => c.Type == "permission").Select(c => c.Value).ToList();
+
+        var result = await _documentService.CreateBulkAsync(createDtos, currentUserId, permissions, cancellationToken);
         return Ok(result);
     }
 
@@ -187,7 +208,10 @@ public class DocumentsController : ControllerBase
         if (updateDtos.Count > MaxBulkSize)
             return BadRequest($"Too many items in bulk request. Maximum allowed: {MaxBulkSize}.");
 
-        var result = await _documentService.UpdateBulkAsync(updateDtos, cancellationToken);
+        var currentUserId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty);
+        var permissions = User.Claims.Where(c => c.Type == "permission").Select(c => c.Value).ToList();
+
+        var result = await _documentService.UpdateBulkAsync(updateDtos, currentUserId, permissions, cancellationToken);
         return Ok(result);
     }
 
@@ -207,7 +231,10 @@ public class DocumentsController : ControllerBase
         if (ids.Length > MaxBulkSize)
             return BadRequest($"Too many items in bulk request. Maximum allowed: {MaxBulkSize}.");
 
-        var result = await _documentService.DeleteBulkAsync(ids, cancellationToken);
+        var currentUserId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty);
+        var permissions = User.Claims.Where(c => c.Type == "permission").Select(c => c.Value).ToList();
+
+        var result = await _documentService.DeleteBulkAsync(ids, currentUserId, permissions, cancellationToken);
         return Ok(result);
     }
 

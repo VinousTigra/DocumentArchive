@@ -2,6 +2,7 @@
 using DocumentArchive.Core.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace DocumentArchive.API.Controllers;
 
@@ -28,7 +29,10 @@ public class DocumentVersionsController : ControllerBase
         [FromQuery] Guid? documentId = null,
         CancellationToken cancellationToken = default)
     {
-        var versions = await _documentVersionService.GetAllAsync(documentId, cancellationToken);
+        var currentUserId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty);
+        var permissions = User.Claims.Where(c => c.Type == "permission").Select(c => c.Value).ToList();
+
+        var versions = await _documentVersionService.GetAllAsync(documentId, currentUserId, permissions, cancellationToken);
         return Ok(versions);
     }
 
@@ -41,7 +45,10 @@ public class DocumentVersionsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<DocumentVersionResponseDto>> GetById(Guid id, CancellationToken cancellationToken)
     {
-        var version = await _documentVersionService.GetByIdAsync(id, cancellationToken);
+        var currentUserId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty);
+        var permissions = User.Claims.Where(c => c.Type == "permission").Select(c => c.Value).ToList();
+
+        var version = await _documentVersionService.GetByIdAsync(id, currentUserId, permissions, cancellationToken);
         if (version == null)
             return NotFound();
         return Ok(version);
@@ -57,7 +64,8 @@ public class DocumentVersionsController : ControllerBase
     public async Task<ActionResult<DocumentVersionResponseDto>> Create([FromBody] CreateDocumentVersionDto dto,
         CancellationToken cancellationToken)
     {
-        var version = await _documentVersionService.CreateAsync(dto, cancellationToken);
+        var currentUserId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty);
+        var version = await _documentVersionService.CreateAsync(dto, currentUserId, cancellationToken);
         return CreatedAtAction(nameof(GetById), new { id = version.Id }, version);
     }
 
@@ -72,7 +80,10 @@ public class DocumentVersionsController : ControllerBase
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateDocumentVersionDto dto,
         CancellationToken cancellationToken)
     {
-        await _documentVersionService.UpdateAsync(id, dto, cancellationToken);
+        var currentUserId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty);
+        var permissions = User.Claims.Where(c => c.Type == "permission").Select(c => c.Value).ToList();
+
+        await _documentVersionService.UpdateAsync(id, dto, currentUserId, permissions, cancellationToken);
         return NoContent();
     }
 
@@ -85,7 +96,10 @@ public class DocumentVersionsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {
-        await _documentVersionService.DeleteAsync(id, cancellationToken);
+        var currentUserId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? string.Empty);
+        var permissions = User.Claims.Where(c => c.Type == "permission").Select(c => c.Value).ToList();
+
+        await _documentVersionService.DeleteAsync(id, currentUserId, permissions, cancellationToken);
         return NoContent();
     }
 }
