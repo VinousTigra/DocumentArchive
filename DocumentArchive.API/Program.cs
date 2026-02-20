@@ -83,22 +83,35 @@ builder.Services.AddCors(options =>
 // Rate Limiting
 builder.Services.AddRateLimiter(options =>
 {
+    // Глобальная политика
     options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
         RateLimitPartition.GetFixedWindowLimiter(
-            httpContext.User.Identity?.Name ?? httpContext.Request.Headers.Host.ToString(),
+            httpContext.User.Identity?.Name ?? httpContext.Connection.RemoteIpAddress?.ToString() ?? "anonymous",
             _ => new FixedWindowRateLimiterOptions
             {
                 AutoReplenishment = true,
                 PermitLimit = 100,
-                QueueLimit = 0,
                 Window = TimeSpan.FromMinutes(1)
             }));
+
+    // Политика для чувствительных эндпоинтов
+    options.AddPolicy("StrictPolicy", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                AutoReplenishment = true,
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(5)
+            }));
+
     options.OnRejected = async (context, token) =>
     {
         context.HttpContext.Response.StatusCode = 429;
         await context.HttpContext.Response.WriteAsync("Too many requests. Please try again later.", token);
     };
 });
+
 
 // Настройка OpenAPI (Scalar)
 builder.Services.AddOpenApi(options =>

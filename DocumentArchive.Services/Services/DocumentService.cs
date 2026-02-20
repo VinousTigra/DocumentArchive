@@ -275,24 +275,74 @@ public class DocumentService : IDocumentService
         return result;
     }
 
-    public async Task<BulkOperationResult<Guid>> UpdateBulkAsync(IEnumerable<UpdateBulkDocumentDto> updateDtos,
-        Guid currentUserId, List<string> permissions, CancellationToken cancellationToken = default)
+    public async Task<BulkOperationResult<Guid>> UpdateBulkAsync(
+        IEnumerable<UpdateBulkDocumentDto> updateDtos,
+        Guid currentUserId,
+        List<string> permissions,
+        CancellationToken cancellationToken = default)
     {
         var result = new BulkOperationResult<Guid>();
+        var dtos = updateDtos.ToList();
+        if (!dtos.Any())
+            return result;
+
+        // Загружаем все документы одним запросом
+        var documentIds = dtos.Select(d => d.Id).Distinct().ToList();
+        var documents = await _context.Documents
+            .Where(d => documentIds.Contains(d.Id))
+            .ToDictionaryAsync(d => d.Id, cancellationToken);
+
+        // Загружаем все категории, которые могут понадобиться для проверки существования
+        var categoryIds = dtos
+            .Where(d => d.CategoryId.HasValue)
+            .Select(d => d.CategoryId!.Value)
+            .Distinct()
+            .ToList();
+        var existingCategories = new HashSet<Guid>();
+        if (categoryIds.Any())
+            existingCategories = (await _context.Categories
+                    .Where(c => categoryIds.Contains(c.Id))
+                    .Select(c => c.Id)
+                    .ToListAsync(cancellationToken))
+                .ToHashSet();
+
         await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
         try
         {
-            foreach (var dto in updateDtos)
+            foreach (var dto in dtos)
                 try
                 {
-                    await UpdateDocumentInternalAsync(dto, currentUserId, permissions, cancellationToken);
-                    result.Results.Add(new BulkOperationItem<Guid> { Id = dto.Id, Success = true });
+                    // Проверяем существование документа
+                    if (!documents.TryGetValue(dto.Id, out var document))
+                        throw new KeyNotFoundException($"Document with id {dto.Id} not found");
+
+                    // Проверяем права на редактирование
+                    if (!CanEditDocument(document, currentUserId, permissions))
+                        throw new UnauthorizedAccessException($"You do not have permission to edit document {dto.Id}");
+
+                    // Проверяем существование категории, если она указана
+                    if (dto.CategoryId.HasValue && !existingCategories.Contains(dto.CategoryId.Value))
+                        throw new InvalidOperationException($"Category with id {dto.CategoryId} not found");
+
+                    // Обновляем документ
+                    _mapper.Map(dto, document);
+                    document.UpdatedAt = DateTime.UtcNow;
+
+                    result.Results.Add(new BulkOperationItem<Guid>
+                    {
+                        Id = dto.Id,
+                        Success = true
+                    });
                 }
                 catch (Exception ex)
                 {
                     _logger.LogWarning(ex, "Bulk update failed for document {DocumentId}", dto.Id);
                     result.Results.Add(new BulkOperationItem<Guid>
-                        { Id = dto.Id, Success = false, Error = ex.Message });
+                    {
+                        Id = dto.Id,
+                        Success = false,
+                        Error = ex.Message
+                    });
                 }
 
             await _context.SaveChangesAsync(cancellationToken);
@@ -314,46 +364,47 @@ public class DocumentService : IDocumentService
         CancellationToken cancellationToken = default)
     {
         var result = new BulkOperationResult<Guid>();
+        var documentIds = ids.Distinct().ToList();
+        if (!documentIds.Any())
+            return result;
+
+        // Загружаем все документы одним запросом
+        var documents = await _context.Documents
+            .Where(d => documentIds.Contains(d.Id))
+            .ToDictionaryAsync(d => d.Id, cancellationToken);
+
         await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
         try
         {
-            foreach (var id in ids)
+            foreach (var id in documentIds)
                 try
                 {
-                    var document = await _context.Documents
-                        .FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
-                    if (document == null)
+                    // Проверяем существование документа
+                    if (!documents.TryGetValue(id, out var document))
                         throw new KeyNotFoundException($"Document with id {id} not found");
 
-                    // Проверка прав на удаление
+                    // Проверяем права на удаление
                     if (!CanDeleteDocument(document, currentUserId, permissions))
                         throw new UnauthorizedAccessException($"You do not have permission to delete document {id}");
 
-                    // Проверка бизнес-правила: документ можно удалить только в течение 30 дней после загрузки
-                    if (!document.CanBeDeleted())
-                        throw new InvalidOperationException(
-                            $"Document {id} cannot be deleted because it was uploaded more than 30 days ago.");
-
-                    // Создание записи в логе архива
-                    var log = new ArchiveLog
-                    {
-                        Id = Guid.NewGuid(),
-                        Action = "Deleted",
-                        ActionType = ActionType.Deleted,
-                        IsCritical = false,
-                        Timestamp = DateTime.UtcNow,
-                        UserId = currentUserId,
-                        DocumentId = document.Id
-                    };
-                    _context.ArchiveLogs.Add(log);
-
+                    // Удаляем документ
                     _context.Documents.Remove(document);
-                    result.Results.Add(new BulkOperationItem<Guid> { Id = id, Success = true });
+
+                    result.Results.Add(new BulkOperationItem<Guid>
+                    {
+                        Id = id,
+                        Success = true
+                    });
                 }
                 catch (Exception ex)
                 {
                     _logger.LogWarning(ex, "Bulk delete failed for document {DocumentId}", id);
-                    result.Results.Add(new BulkOperationItem<Guid> { Id = id, Success = false, Error = ex.Message });
+                    result.Results.Add(new BulkOperationItem<Guid>
+                    {
+                        Id = id,
+                        Success = false,
+                        Error = ex.Message
+                    });
                 }
 
             await _context.SaveChangesAsync(cancellationToken);
