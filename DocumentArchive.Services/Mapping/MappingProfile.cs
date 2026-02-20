@@ -1,5 +1,6 @@
 ﻿using AutoMapper;
 using DocumentArchive.Core.DTOs.ArchiveLog;
+using DocumentArchive.Core.DTOs.Auth;
 using DocumentArchive.Core.DTOs.Category;
 using DocumentArchive.Core.DTOs.Document;
 using DocumentArchive.Core.DTOs.DocumentVersion;
@@ -213,7 +214,21 @@ public class MappingProfile : Profile
             .ForMember(dest => dest.UploadedBy, opt => opt.Ignore())
             .ForMember(dest => dest.Document, opt => opt.Ignore())
             .ForAllMembers(opts => opts.Condition((src, dest, srcMember) => srcMember != null));
-
+        CreateMap<RegisterDto, User>()
+            .ForMember(dest => dest.Id, opt => opt.Ignore())
+            .ForMember(dest => dest.CreatedAt, opt => opt.Ignore())
+            .ForMember(dest => dest.UpdatedAt, opt => opt.Ignore())
+            .ForMember(dest => dest.Documents, opt => opt.Ignore())
+            .ForMember(dest => dest.Logs, opt => opt.Ignore())
+            .ForMember(dest => dest.UserRoles, opt => opt.Ignore())
+            .ForMember(dest => dest.Sessions, opt => opt.Ignore())
+            // Поля, которые мы устанавливаем вручную в AuthService, игнорируем
+            .ForMember(dest => dest.PasswordHash, opt => opt.Ignore())
+            .ForMember(dest => dest.PasswordSalt, opt => opt.Ignore())
+            .ForMember(dest => dest.LastLoginAt, opt => opt.Ignore())
+            .ForMember(dest => dest.IsEmailConfirmed, opt => opt.Ignore())
+            .ForMember(dest => dest.IsActive, opt => opt.Ignore())
+            .ForMember(dest => dest.IsDeleted, opt => opt.Ignore());
         CreateMap<DocumentVersion, DocumentVersionResponseDto>();
         CreateMap<DocumentVersion, DocumentVersionListItemDto>();
     }
