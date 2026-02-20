@@ -4,10 +4,12 @@ using DocumentArchive.Core.DTOs.Shared;
 using DocumentArchive.Core.DTOs.Statistics;
 using DocumentArchive.Core.Interfaces.Services;
 using FluentValidation;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace DocumentArchive.API.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/v1/[controller]")]
 [Produces("application/json")]

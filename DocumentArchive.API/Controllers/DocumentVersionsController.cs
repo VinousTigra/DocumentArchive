@@ -1,9 +1,11 @@
 ﻿using DocumentArchive.Core.DTOs.DocumentVersion;
 using DocumentArchive.Core.Interfaces.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace DocumentArchive.API.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/v1/[controller]")]
 [Produces("application/json")]
