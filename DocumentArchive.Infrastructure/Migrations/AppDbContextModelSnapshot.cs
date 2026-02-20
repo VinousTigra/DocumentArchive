@@ -208,6 +208,80 @@ namespace DocumentArchive.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("Permissions");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("44444444-4444-4444-4444-444444444444"),
+                            Category = "Documents",
+                            CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Просмотр документов",
+                            Name = "ViewDocuments"
+                        },
+                        new
+                        {
+                            Id = new Guid("55555555-5555-5555-5555-555555555555"),
+                            Category = "Documents",
+                            CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Загрузка документов",
+                            Name = "UploadDocuments"
+                        },
+                        new
+                        {
+                            Id = new Guid("66666666-6666-6666-6666-666666666666"),
+                            Category = "Documents",
+                            CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Редактирование своих документов",
+                            Name = "EditOwnDocuments"
+                        },
+                        new
+                        {
+                            Id = new Guid("77777777-7777-7777-7777-777777777777"),
+                            Category = "Documents",
+                            CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Редактирование любых документов",
+                            Name = "EditAnyDocument"
+                        },
+                        new
+                        {
+                            Id = new Guid("88888888-8888-8888-8888-888888888888"),
+                            Category = "Documents",
+                            CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Удаление своих документов",
+                            Name = "DeleteOwnDocuments"
+                        },
+                        new
+                        {
+                            Id = new Guid("99999999-9999-9999-9999-999999999999"),
+                            Category = "Documents",
+                            CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Удаление любых документов",
+                            Name = "DeleteAnyDocument"
+                        },
+                        new
+                        {
+                            Id = new Guid("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+                            Category = "Administration",
+                            CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Управление пользователями",
+                            Name = "ManageUsers"
+                        },
+                        new
+                        {
+                            Id = new Guid("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+                            Category = "Administration",
+                            CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Просмотр логов аудита",
+                            Name = "ViewAuditLogs"
+                        },
+                        new
+                        {
+                            Id = new Guid("cccccccc-cccc-cccc-cccc-cccccccccccc"),
+                            Category = "Administration",
+                            CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Управление ролями и правами",
+                            Name = "ManageRoles"
+                        });
                 });
 
             modelBuilder.Entity("DocumentArchive.Core.Models.Role", b =>
@@ -277,6 +351,93 @@ namespace DocumentArchive.Infrastructure.Migrations
                     b.HasIndex("PermissionId");
 
                     b.ToTable("RolePermissions");
+
+                    b.HasData(
+                        new
+                        {
+                            RoleId = new Guid("11111111-1111-1111-1111-111111111111"),
+                            PermissionId = new Guid("44444444-4444-4444-4444-444444444444")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("11111111-1111-1111-1111-111111111111"),
+                            PermissionId = new Guid("55555555-5555-5555-5555-555555555555")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("11111111-1111-1111-1111-111111111111"),
+                            PermissionId = new Guid("66666666-6666-6666-6666-666666666666")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("11111111-1111-1111-1111-111111111111"),
+                            PermissionId = new Guid("77777777-7777-7777-7777-777777777777")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("11111111-1111-1111-1111-111111111111"),
+                            PermissionId = new Guid("88888888-8888-8888-8888-888888888888")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("11111111-1111-1111-1111-111111111111"),
+                            PermissionId = new Guid("99999999-9999-9999-9999-999999999999")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("11111111-1111-1111-1111-111111111111"),
+                            PermissionId = new Guid("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("11111111-1111-1111-1111-111111111111"),
+                            PermissionId = new Guid("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("11111111-1111-1111-1111-111111111111"),
+                            PermissionId = new Guid("cccccccc-cccc-cccc-cccc-cccccccccccc")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("33333333-3333-3333-3333-333333333333"),
+                            PermissionId = new Guid("44444444-4444-4444-4444-444444444444")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("33333333-3333-3333-3333-333333333333"),
+                            PermissionId = new Guid("55555555-5555-5555-5555-555555555555")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("33333333-3333-3333-3333-333333333333"),
+                            PermissionId = new Guid("77777777-7777-7777-7777-777777777777")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("33333333-3333-3333-3333-333333333333"),
+                            PermissionId = new Guid("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("22222222-2222-2222-2222-222222222222"),
+                            PermissionId = new Guid("44444444-4444-4444-4444-444444444444")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("22222222-2222-2222-2222-222222222222"),
+                            PermissionId = new Guid("55555555-5555-5555-5555-555555555555")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("22222222-2222-2222-2222-222222222222"),
+                            PermissionId = new Guid("66666666-6666-6666-6666-666666666666")
+                        },
+                        new
+                        {
+                            RoleId = new Guid("22222222-2222-2222-2222-222222222222"),
+                            PermissionId = new Guid("88888888-8888-8888-8888-888888888888")
+                        });
                 });
 
             modelBuilder.Entity("DocumentArchive.Core.Models.User", b =>
@@ -368,6 +529,50 @@ namespace DocumentArchive.Infrastructure.Migrations
                     b.ToTable("UserRoles");
                 });
 
+            modelBuilder.Entity("DocumentArchive.Core.Models.UserSession", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("DeviceInfo")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<bool>("IsRevoked")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("RefreshTokenHash")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExpiresAt");
+
+                    b.HasIndex("RefreshTokenHash");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("UserSessions");
+                });
+
             modelBuilder.Entity("DocumentArchive.Core.Models.ArchiveLog", b =>
                 {
                     b.HasOne("DocumentArchive.Core.Models.Document", "Document")
@@ -451,6 +656,17 @@ namespace DocumentArchive.Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("DocumentArchive.Core.Models.UserSession", b =>
+                {
+                    b.HasOne("DocumentArchive.Core.Models.User", "User")
+                        .WithMany("Sessions")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("DocumentArchive.Core.Models.Category", b =>
                 {
                     b.Navigation("Documents");
@@ -480,6 +696,8 @@ namespace DocumentArchive.Infrastructure.Migrations
                     b.Navigation("Documents");
 
                     b.Navigation("Logs");
+
+                    b.Navigation("Sessions");
 
                     b.Navigation("UserRoles");
                 });

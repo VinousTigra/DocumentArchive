@@ -6,6 +6,7 @@ public class User
     public string Username { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
 
+
     // Поля для аутентификации (ЛР4)
     public string? PasswordHash { get; set; }
     public string? PasswordSalt { get; set; }
@@ -24,4 +25,5 @@ public class User
     public ICollection<Document> Documents { get; set; } = new List<Document>();
     public ICollection<ArchiveLog> Logs { get; set; } = new List<ArchiveLog>();
     public ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
+    public ICollection<UserSession> Sessions { get; set; } = new List<UserSession>();
 }

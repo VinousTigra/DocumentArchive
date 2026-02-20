@@ -19,6 +19,7 @@ public class AppDbContext : DbContext
     public DbSet<Document> Documents => Set<Document>();
     public DbSet<DocumentVersion> DocumentVersions => Set<DocumentVersion>();
     public DbSet<ArchiveLog> ArchiveLogs => Set<ArchiveLog>();
+    public DbSet<UserSession> UserSessions => Set<UserSession>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -51,6 +52,26 @@ public class AppDbContext : DbContext
 
             entity.HasIndex(u => u.Email).IsUnique();
             entity.HasIndex(u => u.Username).IsUnique();
+        });
+
+        modelBuilder.Entity<UserSession>(entity =>
+        {
+            entity.HasKey(us => us.Id);
+            entity.Property(us => us.RefreshTokenHash)
+                .IsRequired()
+                .HasMaxLength(500);
+            entity.Property(us => us.DeviceInfo).HasMaxLength(500);
+            entity.Property(us => us.IpAddress).HasMaxLength(50);
+            entity.Property(us => us.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.HasOne(us => us.User)
+                .WithMany(u => u.Sessions) // если добавите навигацию в User
+                .HasForeignKey(us => us.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(us => us.RefreshTokenHash);
+            entity.HasIndex(us => us.ExpiresAt);
         });
 
         // Настройка сущности Role
@@ -234,6 +255,94 @@ public class AppDbContext : DbContext
             }
         );
 
+        // ===== Seed Permissions =====
+        var viewDocsPermId = Guid.Parse("44444444-4444-4444-4444-444444444444");
+        var uploadDocsPermId = Guid.Parse("55555555-5555-5555-5555-555555555555");
+        var editOwnDocsPermId = Guid.Parse("66666666-6666-6666-6666-666666666666");
+        var editAnyDocsPermId = Guid.Parse("77777777-7777-7777-7777-777777777777");
+        var deleteOwnDocsPermId = Guid.Parse("88888888-8888-8888-8888-888888888888");
+        var deleteAnyDocsPermId = Guid.Parse("99999999-9999-9999-9999-999999999999");
+        var manageUsersPermId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        var viewAuditLogsPermId = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+        var manageRolesPermId = Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc");
+
+        modelBuilder.Entity<Permission>().HasData(
+            new Permission
+            {
+                Id = viewDocsPermId, Name = "ViewDocuments", Description = "Просмотр документов",
+                Category = "Documents", CreatedAt = seedDate
+            },
+            new Permission
+            {
+                Id = uploadDocsPermId, Name = "UploadDocuments", Description = "Загрузка документов",
+                Category = "Documents", CreatedAt = seedDate
+            },
+            new Permission
+            {
+                Id = editOwnDocsPermId, Name = "EditOwnDocuments", Description = "Редактирование своих документов",
+                Category = "Documents", CreatedAt = seedDate
+            },
+            new Permission
+            {
+                Id = editAnyDocsPermId, Name = "EditAnyDocument", Description = "Редактирование любых документов",
+                Category = "Documents", CreatedAt = seedDate
+            },
+            new Permission
+            {
+                Id = deleteOwnDocsPermId, Name = "DeleteOwnDocuments", Description = "Удаление своих документов",
+                Category = "Documents", CreatedAt = seedDate
+            },
+            new Permission
+            {
+                Id = deleteAnyDocsPermId, Name = "DeleteAnyDocument", Description = "Удаление любых документов",
+                Category = "Documents", CreatedAt = seedDate
+            },
+            new Permission
+            {
+                Id = manageUsersPermId, Name = "ManageUsers", Description = "Управление пользователями",
+                Category = "Administration", CreatedAt = seedDate
+            },
+            new Permission
+            {
+                Id = viewAuditLogsPermId, Name = "ViewAuditLogs", Description = "Просмотр логов аудита",
+                Category = "Administration", CreatedAt = seedDate
+            },
+            new Permission
+            {
+                Id = manageRolesPermId, Name = "ManageRoles", Description = "Управление ролями и правами",
+                Category = "Administration", CreatedAt = seedDate
+            }
+        );
+
+// ===== Seed RolePermissions =====
+// Admin получает все права
+        modelBuilder.Entity<RolePermission>().HasData(
+            new RolePermission { RoleId = adminRoleId, PermissionId = viewDocsPermId },
+            new RolePermission { RoleId = adminRoleId, PermissionId = uploadDocsPermId },
+            new RolePermission { RoleId = adminRoleId, PermissionId = editOwnDocsPermId },
+            new RolePermission { RoleId = adminRoleId, PermissionId = editAnyDocsPermId },
+            new RolePermission { RoleId = adminRoleId, PermissionId = deleteOwnDocsPermId },
+            new RolePermission { RoleId = adminRoleId, PermissionId = deleteAnyDocsPermId },
+            new RolePermission { RoleId = adminRoleId, PermissionId = manageUsersPermId },
+            new RolePermission { RoleId = adminRoleId, PermissionId = viewAuditLogsPermId },
+            new RolePermission { RoleId = adminRoleId, PermissionId = manageRolesPermId }
+        );
+
+// Moderator
+        modelBuilder.Entity<RolePermission>().HasData(
+            new RolePermission { RoleId = moderatorRoleId, PermissionId = viewDocsPermId },
+            new RolePermission { RoleId = moderatorRoleId, PermissionId = uploadDocsPermId },
+            new RolePermission { RoleId = moderatorRoleId, PermissionId = editAnyDocsPermId },
+            new RolePermission { RoleId = moderatorRoleId, PermissionId = viewAuditLogsPermId }
+        );
+
+// User
+        modelBuilder.Entity<RolePermission>().HasData(
+            new RolePermission { RoleId = userRoleId, PermissionId = viewDocsPermId },
+            new RolePermission { RoleId = userRoleId, PermissionId = uploadDocsPermId },
+            new RolePermission { RoleId = userRoleId, PermissionId = editOwnDocsPermId },
+            new RolePermission { RoleId = userRoleId, PermissionId = deleteOwnDocsPermId }
+        );
         base.OnModelCreating(modelBuilder);
     }
 }
