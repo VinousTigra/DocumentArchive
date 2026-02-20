@@ -1,16 +1,16 @@
 using System.Text;
+using System.Threading.RateLimiting;
 using DocumentArchive.API.Middleware;
 using DocumentArchive.Core.Authorization;
 using DocumentArchive.Infrastructure.Data;
 using DocumentArchive.Services.DependencyInjection;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Scalar.AspNetCore;
-using System.Threading.RateLimiting;
-using Microsoft.AspNetCore.HttpOverrides;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -26,7 +26,9 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 // JWT настройки
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
-var secretKey = jwtSettings["SecretKey"] ?? throw new InvalidOperationException("JWT SecretKey is not configured. Set it via environment variable or secure configuration.");
+var secretKey = jwtSettings["SecretKey"] ??
+                throw new InvalidOperationException(
+                    "JWT SecretKey is not configured. Set it via environment variable or secure configuration.");
 
 builder.Services.AddAuthentication(options =>
     {
@@ -54,8 +56,10 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("RequireAdminRole", policy => policy.RequireRole("Admin"));
     options.AddPolicy("EmailConfirmed", policy => policy.RequireClaim("IsEmailConfirmed", "True"));
     options.AddPolicy("MinimumAge18", policy => policy.Requirements.Add(new MinimumAgeRequirement(18)));
-    options.AddPolicy("CanEditDocument", policy => policy.Requirements.Add(new PermissionRequirement("EditOwnDocuments", "EditAnyDocument")));
-    options.AddPolicy("CanDeleteDocument", policy => policy.Requirements.Add(new PermissionRequirement("DeleteOwnDocuments", "DeleteAnyDocument")));
+    options.AddPolicy("CanEditDocument",
+        policy => policy.Requirements.Add(new PermissionRequirement("EditOwnDocuments", "EditAnyDocument")));
+    options.AddPolicy("CanDeleteDocument",
+        policy => policy.Requirements.Add(new PermissionRequirement("DeleteOwnDocuments", "DeleteAnyDocument")));
 });
 builder.Services.AddSingleton<IAuthorizationHandler, MinimumAgeHandler>();
 builder.Services.AddSingleton<IAuthorizationHandler, PermissionHandler>();
@@ -67,27 +71,23 @@ builder.Services.AddCors(options =>
     {
         var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>();
         if (allowedOrigins != null && allowedOrigins.Length > 0)
-        {
             policy.WithOrigins(allowedOrigins)
-                  .AllowAnyMethod()
-                  .AllowAnyHeader()
-                  .AllowCredentials();
-        }
+                .AllowAnyMethod()
+                .AllowAnyHeader()
+                .AllowCredentials();
         else
-        {
             // Для разработки можно разрешить всё
             policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader();
-        }
     });
 });
 
 // Rate Limiting
 builder.Services.AddRateLimiter(options =>
 {
-    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(
-        httpContext => RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: httpContext.User.Identity?.Name ?? httpContext.Request.Headers.Host.ToString(),
-            factory: _ => new FixedWindowRateLimiterOptions
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            httpContext.User.Identity?.Name ?? httpContext.Request.Headers.Host.ToString(),
+            _ => new FixedWindowRateLimiterOptions
             {
                 AutoReplenishment = true,
                 PermitLimit = 100,
@@ -123,6 +123,14 @@ builder.Services.AddOpenApi(options =>
 });
 
 var app = builder.Build();
+
+// Применение миграций в Development
+if (app.Environment.IsDevelopment())
+{
+    using var scope = app.Services.CreateScope();
+    var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    await dbContext.Database.MigrateAsync();
+}
 
 // Конфигурация конвейера обработки HTTP-запросов
 if (app.Environment.IsDevelopment())

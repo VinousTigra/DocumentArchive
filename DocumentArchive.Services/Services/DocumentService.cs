@@ -15,8 +15,8 @@ namespace DocumentArchive.Services.Services;
 public class DocumentService : IDocumentService
 {
     private readonly AppDbContext _context;
-    private readonly IMapper _mapper;
     private readonly ILogger<DocumentService> _logger;
+    private readonly IMapper _mapper;
 
     public DocumentService(AppDbContext context, IMapper mapper, ILogger<DocumentService> logger)
     {
@@ -24,27 +24,6 @@ public class DocumentService : IDocumentService
         _mapper = mapper;
         _logger = logger;
     }
-
-    #region Private helper methods for permission checks
-
-    private bool CanViewDocument(Document document, Guid currentUserId, List<string> permissions)
-    {
-        return document.UserId == currentUserId || permissions.Contains("ViewAnyDocument");
-    }
-
-    private bool CanEditDocument(Document document, Guid currentUserId, List<string> permissions)
-    {
-        return (document.UserId == currentUserId && permissions.Contains("EditOwnDocuments"))
-               || permissions.Contains("EditAnyDocument");
-    }
-
-    private bool CanDeleteDocument(Document document, Guid currentUserId, List<string> permissions)
-    {
-        return (document.UserId == currentUserId && permissions.Contains("DeleteOwnDocuments"))
-               || permissions.Contains("DeleteAnyDocument");
-    }
-
-    #endregion
 
     public async Task<PagedResult<DocumentListItemDto>> GetDocumentsAsync(
         int page,
@@ -59,22 +38,19 @@ public class DocumentService : IDocumentService
         List<string> permissions,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Getting documents page {Page} size {PageSize} for user {UserId}", page, pageSize, currentUserId);
+        _logger.LogInformation("Getting documents page {Page} size {PageSize} for user {UserId}", page, pageSize,
+            currentUserId);
 
         var query = _context.Documents
             .AsNoTracking()
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(search))
-        {
             query = query.Where(d => d.Title.Contains(search) ||
                                      (d.Description != null && d.Description.Contains(search)));
-        }
 
         if (categoryIds?.Any() == true)
-        {
             query = query.Where(d => d.CategoryId.HasValue && categoryIds.Contains(d.CategoryId.Value));
-        }
 
         if (fromDate.HasValue)
             query = query.Where(d => d.UploadDate >= fromDate.Value);
@@ -82,13 +58,8 @@ public class DocumentService : IDocumentService
             query = query.Where(d => d.UploadDate <= toDate.Value);
 
         if (!permissions.Contains("ViewAnyDocument"))
-        {
             query = query.Where(d => d.UserId == currentUserId);
-        }
-        else if (userId.HasValue)
-        {
-            query = query.Where(d => d.UserId == userId.Value);
-        }
+        else if (userId.HasValue) query = query.Where(d => d.UserId == userId.Value);
 
         query = ApplySorting(query, sort);
 
@@ -109,46 +80,8 @@ public class DocumentService : IDocumentService
         };
     }
 
-    private IQueryable<Document> ApplySorting(IQueryable<Document> query, string? sort)
-    {
-        if (string.IsNullOrWhiteSpace(sort))
-            return query.OrderByDescending(d => d.UploadDate);
-
-        var fields = sort.Split(',');
-        IOrderedQueryable<Document>? orderedQuery = null;
-
-        foreach (var field in fields)
-        {
-            var parts = field.Split(':');
-            var fieldName = parts[0].Trim().ToLower();
-            var direction = parts.Length > 1 ? parts[1].Trim().ToLower() : "asc";
-
-            var isDescending = direction == "desc";
-
-            if (orderedQuery == null)
-            {
-                orderedQuery = fieldName switch
-                {
-                    "title" => isDescending ? query.OrderByDescending(d => d.Title) : query.OrderBy(d => d.Title),
-                    "uploaddate" => isDescending ? query.OrderByDescending(d => d.UploadDate) : query.OrderBy(d => d.UploadDate),
-                    _ => isDescending ? query.OrderByDescending(d => d.UploadDate) : query.OrderBy(d => d.UploadDate)
-                };
-            }
-            else
-            {
-                orderedQuery = fieldName switch
-                {
-                    "title" => isDescending ? orderedQuery.ThenByDescending(d => d.Title) : orderedQuery.ThenBy(d => d.Title),
-                    "uploaddate" => isDescending ? orderedQuery.ThenByDescending(d => d.UploadDate) : orderedQuery.ThenBy(d => d.UploadDate),
-                    _ => isDescending ? orderedQuery.ThenByDescending(d => d.UploadDate) : orderedQuery.ThenBy(d => d.UploadDate)
-                };
-            }
-        }
-
-        return orderedQuery ?? query.OrderByDescending(d => d.UploadDate);
-    }
-
-    public async Task<DocumentResponseDto?> GetDocumentByIdAsync(Guid id, Guid currentUserId, List<string> permissions, CancellationToken cancellationToken = default)
+    public async Task<DocumentResponseDto?> GetDocumentByIdAsync(Guid id, Guid currentUserId, List<string> permissions,
+        CancellationToken cancellationToken = default)
     {
         var document = await _context.Documents
             .AsNoTracking()
@@ -165,11 +98,13 @@ public class DocumentService : IDocumentService
         return _mapper.Map<DocumentResponseDto>(document);
     }
 
-    public async Task<DocumentResponseDto> CreateDocumentAsync(CreateDocumentDto createDto, Guid currentUserId, CancellationToken cancellationToken = default)
+    public async Task<DocumentResponseDto> CreateDocumentAsync(CreateDocumentDto createDto, Guid currentUserId,
+        CancellationToken cancellationToken = default)
     {
         if (createDto.CategoryId.HasValue)
         {
-            var categoryExists = await _context.Categories.AnyAsync(c => c.Id == createDto.CategoryId.Value, cancellationToken);
+            var categoryExists =
+                await _context.Categories.AnyAsync(c => c.Id == createDto.CategoryId.Value, cancellationToken);
             if (!categoryExists)
                 throw new InvalidOperationException($"Category with id {createDto.CategoryId} not found");
         }
@@ -199,7 +134,8 @@ public class DocumentService : IDocumentService
         return _mapper.Map<DocumentResponseDto>(document);
     }
 
-    public async Task UpdateDocumentAsync(Guid id, UpdateDocumentDto updateDto, Guid currentUserId, List<string> permissions, CancellationToken cancellationToken = default)
+    public async Task UpdateDocumentAsync(Guid id, UpdateDocumentDto updateDto, Guid currentUserId,
+        List<string> permissions, CancellationToken cancellationToken = default)
     {
         var document = await _context.Documents
             .FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
@@ -211,7 +147,8 @@ public class DocumentService : IDocumentService
 
         if (updateDto.CategoryId.HasValue)
         {
-            var categoryExists = await _context.Categories.AnyAsync(c => c.Id == updateDto.CategoryId.Value, cancellationToken);
+            var categoryExists =
+                await _context.Categories.AnyAsync(c => c.Id == updateDto.CategoryId.Value, cancellationToken);
             if (!categoryExists)
                 throw new InvalidOperationException($"Category with id {updateDto.CategoryId} not found");
         }
@@ -235,7 +172,8 @@ public class DocumentService : IDocumentService
         _logger.LogInformation("Document {DocumentId} updated by user {UserId}", id, currentUserId);
     }
 
-    public async Task DeleteDocumentAsync(Guid id, Guid currentUserId, List<string> permissions, CancellationToken cancellationToken = default)
+    public async Task DeleteDocumentAsync(Guid id, Guid currentUserId, List<string> permissions,
+        CancellationToken cancellationToken = default)
     {
         var document = await _context.Documents
             .FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
@@ -244,6 +182,11 @@ public class DocumentService : IDocumentService
 
         if (!CanDeleteDocument(document, currentUserId, permissions))
             throw new UnauthorizedAccessException("You do not have permission to delete this document");
+
+        // Добавляем проверку бизнес-правила
+        if (!document.CanBeDeleted())
+            throw new InvalidOperationException(
+                "Document cannot be deleted because it was uploaded more than 30 days ago.");
 
         var log = new ArchiveLog
         {
@@ -301,14 +244,14 @@ public class DocumentService : IDocumentService
         };
     }
 
-    public async Task<BulkOperationResult<Guid>> CreateBulkAsync(IEnumerable<CreateDocumentDto> createDtos, Guid currentUserId, List<string> permissions, CancellationToken cancellationToken = default)
+    public async Task<BulkOperationResult<Guid>> CreateBulkAsync(IEnumerable<CreateDocumentDto> createDtos,
+        Guid currentUserId, List<string> permissions, CancellationToken cancellationToken = default)
     {
         var result = new BulkOperationResult<Guid>();
         await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
         try
         {
             foreach (var dto in createDtos)
-            {
                 try
                 {
                     var doc = await CreateDocumentInternalAsync(dto, currentUserId, cancellationToken);
@@ -319,7 +262,7 @@ public class DocumentService : IDocumentService
                     _logger.LogWarning(ex, "Bulk create failed for document");
                     result.Results.Add(new BulkOperationItem<Guid> { Success = false, Error = ex.Message });
                 }
-            }
+
             await _context.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
         }
@@ -328,47 +271,18 @@ public class DocumentService : IDocumentService
             await transaction.RollbackAsync(cancellationToken);
             throw;
         }
+
         return result;
     }
 
-    private async Task<Document> CreateDocumentInternalAsync(CreateDocumentDto createDto, Guid currentUserId, CancellationToken cancellationToken)
-    {
-        if (createDto.CategoryId.HasValue)
-        {
-            var categoryExists = await _context.Categories.AnyAsync(c => c.Id == createDto.CategoryId.Value, cancellationToken);
-            if (!categoryExists)
-                throw new InvalidOperationException($"Category with id {createDto.CategoryId} not found");
-        }
-
-        var document = _mapper.Map<Document>(createDto);
-        document.Id = Guid.NewGuid();
-        document.UserId = currentUserId;
-        document.UploadDate = DateTime.UtcNow;
-        _context.Documents.Add(document);
-
-        var log = new ArchiveLog
-        {
-            Id = Guid.NewGuid(),
-            Action = "Created",
-            ActionType = ActionType.Created,
-            IsCritical = false,
-            Timestamp = DateTime.UtcNow,
-            UserId = currentUserId,
-            DocumentId = document.Id
-        };
-        _context.ArchiveLogs.Add(log);
-
-        return document;
-    }
-
-    public async Task<BulkOperationResult<Guid>> UpdateBulkAsync(IEnumerable<UpdateBulkDocumentDto> updateDtos, Guid currentUserId, List<string> permissions, CancellationToken cancellationToken = default)
+    public async Task<BulkOperationResult<Guid>> UpdateBulkAsync(IEnumerable<UpdateBulkDocumentDto> updateDtos,
+        Guid currentUserId, List<string> permissions, CancellationToken cancellationToken = default)
     {
         var result = new BulkOperationResult<Guid>();
         await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
         try
         {
             foreach (var dto in updateDtos)
-            {
                 try
                 {
                     await UpdateDocumentInternalAsync(dto, currentUserId, permissions, cancellationToken);
@@ -377,9 +291,10 @@ public class DocumentService : IDocumentService
                 catch (Exception ex)
                 {
                     _logger.LogWarning(ex, "Bulk update failed for document {DocumentId}", dto.Id);
-                    result.Results.Add(new BulkOperationItem<Guid> { Id = dto.Id, Success = false, Error = ex.Message });
+                    result.Results.Add(new BulkOperationItem<Guid>
+                        { Id = dto.Id, Success = false, Error = ex.Message });
                 }
-            }
+
             await _context.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
         }
@@ -388,50 +303,21 @@ public class DocumentService : IDocumentService
             await transaction.RollbackAsync(cancellationToken);
             throw;
         }
+
         return result;
     }
 
-    private async Task UpdateDocumentInternalAsync(UpdateBulkDocumentDto dto, Guid currentUserId, List<string> permissions, CancellationToken cancellationToken)
-    {
-        var document = await _context.Documents
-            .FirstOrDefaultAsync(d => d.Id == dto.Id, cancellationToken);
-        if (document == null)
-            throw new KeyNotFoundException($"Document with id {dto.Id} not found");
-
-        if (!CanEditDocument(document, currentUserId, permissions))
-            throw new UnauthorizedAccessException($"You do not have permission to edit document {dto.Id}");
-
-        if (dto.CategoryId.HasValue)
-        {
-            var categoryExists = await _context.Categories.AnyAsync(c => c.Id == dto.CategoryId.Value, cancellationToken);
-            if (!categoryExists)
-                throw new InvalidOperationException($"Category with id {dto.CategoryId} not found");
-        }
-
-        _mapper.Map(dto, document);
-        document.UpdatedAt = DateTime.UtcNow;
-
-        var log = new ArchiveLog
-        {
-            Id = Guid.NewGuid(),
-            Action = "Updated",
-            ActionType = ActionType.Updated,
-            IsCritical = false,
-            Timestamp = DateTime.UtcNow,
-            UserId = currentUserId,
-            DocumentId = document.Id
-        };
-        _context.ArchiveLogs.Add(log);
-    }
-
-    public async Task<BulkOperationResult<Guid>> DeleteBulkAsync(IEnumerable<Guid> ids, Guid currentUserId, List<string> permissions, CancellationToken cancellationToken = default)
+    public async Task<BulkOperationResult<Guid>> DeleteBulkAsync(
+        IEnumerable<Guid> ids,
+        Guid currentUserId,
+        List<string> permissions,
+        CancellationToken cancellationToken = default)
     {
         var result = new BulkOperationResult<Guid>();
         await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
         try
         {
             foreach (var id in ids)
-            {
                 try
                 {
                     var document = await _context.Documents
@@ -439,9 +325,16 @@ public class DocumentService : IDocumentService
                     if (document == null)
                         throw new KeyNotFoundException($"Document with id {id} not found");
 
+                    // Проверка прав на удаление
                     if (!CanDeleteDocument(document, currentUserId, permissions))
                         throw new UnauthorizedAccessException($"You do not have permission to delete document {id}");
 
+                    // Проверка бизнес-правила: документ можно удалить только в течение 30 дней после загрузки
+                    if (!document.CanBeDeleted())
+                        throw new InvalidOperationException(
+                            $"Document {id} cannot be deleted because it was uploaded more than 30 days ago.");
+
+                    // Создание записи в логе архива
                     var log = new ArchiveLog
                     {
                         Id = Guid.NewGuid(),
@@ -462,7 +355,7 @@ public class DocumentService : IDocumentService
                     _logger.LogWarning(ex, "Bulk delete failed for document {DocumentId}", id);
                     result.Results.Add(new BulkOperationItem<Guid> { Id = id, Success = false, Error = ex.Message });
                 }
-            }
+
             await _context.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
         }
@@ -471,10 +364,12 @@ public class DocumentService : IDocumentService
             await transaction.RollbackAsync(cancellationToken);
             throw;
         }
+
         return result;
     }
 
-    public async Task<Dictionary<string, int>> GetDocumentsCountByCategoryAsync(CancellationToken cancellationToken = default)
+    public async Task<Dictionary<string, int>> GetDocumentsCountByCategoryAsync(
+        CancellationToken cancellationToken = default)
     {
         return await _context.Documents
             .Where(d => d.CategoryId != null)
@@ -508,4 +403,135 @@ public class DocumentService : IDocumentService
             LastUploadedDocument = lastUploaded
         };
     }
+
+    private IQueryable<Document> ApplySorting(IQueryable<Document> query, string? sort)
+    {
+        if (string.IsNullOrWhiteSpace(sort))
+            return query.OrderByDescending(d => d.UploadDate);
+
+        var fields = sort.Split(',');
+        IOrderedQueryable<Document>? orderedQuery = null;
+
+        foreach (var field in fields)
+        {
+            var parts = field.Split(':');
+            var fieldName = parts[0].Trim().ToLower();
+            var direction = parts.Length > 1 ? parts[1].Trim().ToLower() : "asc";
+
+            var isDescending = direction == "desc";
+
+            if (orderedQuery == null)
+                orderedQuery = fieldName switch
+                {
+                    "title" => isDescending ? query.OrderByDescending(d => d.Title) : query.OrderBy(d => d.Title),
+                    "uploaddate" => isDescending
+                        ? query.OrderByDescending(d => d.UploadDate)
+                        : query.OrderBy(d => d.UploadDate),
+                    _ => isDescending ? query.OrderByDescending(d => d.UploadDate) : query.OrderBy(d => d.UploadDate)
+                };
+            else
+                orderedQuery = fieldName switch
+                {
+                    "title" => isDescending
+                        ? orderedQuery.ThenByDescending(d => d.Title)
+                        : orderedQuery.ThenBy(d => d.Title),
+                    "uploaddate" => isDescending
+                        ? orderedQuery.ThenByDescending(d => d.UploadDate)
+                        : orderedQuery.ThenBy(d => d.UploadDate),
+                    _ => isDescending
+                        ? orderedQuery.ThenByDescending(d => d.UploadDate)
+                        : orderedQuery.ThenBy(d => d.UploadDate)
+                };
+        }
+
+        return orderedQuery ?? query.OrderByDescending(d => d.UploadDate);
+    }
+
+    private async Task<Document> CreateDocumentInternalAsync(CreateDocumentDto createDto, Guid currentUserId,
+        CancellationToken cancellationToken)
+    {
+        if (createDto.CategoryId.HasValue)
+        {
+            var categoryExists =
+                await _context.Categories.AnyAsync(c => c.Id == createDto.CategoryId.Value, cancellationToken);
+            if (!categoryExists)
+                throw new InvalidOperationException($"Category with id {createDto.CategoryId} not found");
+        }
+
+        var document = _mapper.Map<Document>(createDto);
+        document.Id = Guid.NewGuid();
+        document.UserId = currentUserId;
+        document.UploadDate = DateTime.UtcNow;
+        _context.Documents.Add(document);
+
+        var log = new ArchiveLog
+        {
+            Id = Guid.NewGuid(),
+            Action = "Created",
+            ActionType = ActionType.Created,
+            IsCritical = false,
+            Timestamp = DateTime.UtcNow,
+            UserId = currentUserId,
+            DocumentId = document.Id
+        };
+        _context.ArchiveLogs.Add(log);
+
+        return document;
+    }
+
+    private async Task UpdateDocumentInternalAsync(UpdateBulkDocumentDto dto, Guid currentUserId,
+        List<string> permissions, CancellationToken cancellationToken)
+    {
+        var document = await _context.Documents
+            .FirstOrDefaultAsync(d => d.Id == dto.Id, cancellationToken);
+        if (document == null)
+            throw new KeyNotFoundException($"Document with id {dto.Id} not found");
+
+        if (!CanEditDocument(document, currentUserId, permissions))
+            throw new UnauthorizedAccessException($"You do not have permission to edit document {dto.Id}");
+
+        if (dto.CategoryId.HasValue)
+        {
+            var categoryExists =
+                await _context.Categories.AnyAsync(c => c.Id == dto.CategoryId.Value, cancellationToken);
+            if (!categoryExists)
+                throw new InvalidOperationException($"Category with id {dto.CategoryId} not found");
+        }
+
+        _mapper.Map(dto, document);
+        document.UpdatedAt = DateTime.UtcNow;
+
+        var log = new ArchiveLog
+        {
+            Id = Guid.NewGuid(),
+            Action = "Updated",
+            ActionType = ActionType.Updated,
+            IsCritical = false,
+            Timestamp = DateTime.UtcNow,
+            UserId = currentUserId,
+            DocumentId = document.Id
+        };
+        _context.ArchiveLogs.Add(log);
+    }
+
+    #region Private helper methods for permission checks
+
+    private bool CanViewDocument(Document document, Guid currentUserId, List<string> permissions)
+    {
+        return document.UserId == currentUserId || permissions.Contains("ViewAnyDocument");
+    }
+
+    private bool CanEditDocument(Document document, Guid currentUserId, List<string> permissions)
+    {
+        return (document.UserId == currentUserId && permissions.Contains("EditOwnDocuments"))
+               || permissions.Contains("EditAnyDocument");
+    }
+
+    private bool CanDeleteDocument(Document document, Guid currentUserId, List<string> permissions)
+    {
+        return (document.UserId == currentUserId && permissions.Contains("DeleteOwnDocuments"))
+               || permissions.Contains("DeleteAnyDocument");
+    }
+
+    #endregion
 }
