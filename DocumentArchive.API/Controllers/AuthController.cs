@@ -14,16 +14,29 @@ public class AuthController : ControllerBase
     private readonly IAuthService _authService;
     private readonly IValidator<RegisterDto> _registerValidator;
     private readonly IValidator<LoginDto> _loginValidator;
+    private readonly IValidator<ForgotPasswordDto> _forgotPasswordValidator;
+    private readonly IValidator<ResetPasswordDto> _resetPasswordValidator;
+    private readonly IValidator<ChangePasswordDto> _changePasswordValidator;
+    private readonly IValidator<ConfirmEmailDto> _confirmEmailValidator;
 
     public AuthController(
         IAuthService authService,
         IValidator<RegisterDto> registerValidator,
-        IValidator<LoginDto> loginValidator)
+        IValidator<LoginDto> loginValidator,
+        IValidator<ForgotPasswordDto> forgotPasswordValidator,
+        IValidator<ResetPasswordDto> resetPasswordValidator,
+        IValidator<ChangePasswordDto> changePasswordValidator,
+        IValidator<ConfirmEmailDto> confirmEmailValidator)
     {
         _authService = authService;
         _registerValidator = registerValidator;
         _loginValidator = loginValidator;
+        _forgotPasswordValidator = forgotPasswordValidator;
+        _resetPasswordValidator = resetPasswordValidator;
+        _changePasswordValidator = changePasswordValidator;
+        _confirmEmailValidator = confirmEmailValidator;
     }
+
 
     [HttpPost("register")]
     [ProducesResponseType(typeof(AuthResponseDto), StatusCodes.Status201Created)]
@@ -138,4 +151,94 @@ public class AuthController : ControllerBase
             return NotFound();
         }
     }
+    
+    [HttpPost("forgot-password")]
+[ProducesResponseType(StatusCodes.Status200OK)]
+[ProducesResponseType(StatusCodes.Status400BadRequest)]
+public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDto dto)
+{
+    var validationResult = await _forgotPasswordValidator.ValidateAsync(dto);
+    if (!validationResult.IsValid)
+        return BadRequest(validationResult.Errors);
+
+    var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+    await _authService.ForgotPasswordAsync(dto, ipAddress);
+    return Ok(new { message = "If the email exists, a reset link has been sent" });
+}
+
+[HttpPost("reset-password")]
+[ProducesResponseType(StatusCodes.Status200OK)]
+[ProducesResponseType(StatusCodes.Status400BadRequest)]
+public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto dto)
+{
+    var validationResult = await _resetPasswordValidator.ValidateAsync(dto);
+    if (!validationResult.IsValid)
+        return BadRequest(validationResult.Errors);
+
+    try
+    {
+        var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        await _authService.ResetPasswordAsync(dto, ipAddress);
+        return Ok(new { message = "Password has been reset successfully" });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return BadRequest(new { message = ex.Message });
+    }
+}
+
+[Authorize]
+[HttpPost("change-password")]
+[ProducesResponseType(StatusCodes.Status200OK)]
+[ProducesResponseType(StatusCodes.Status400BadRequest)]
+[ProducesResponseType(StatusCodes.Status401Unauthorized)]
+public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto dto)
+{
+    var validationResult = await _changePasswordValidator.ValidateAsync(dto);
+    if (!validationResult.IsValid)
+        return BadRequest(validationResult.Errors);
+
+    var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+    if (!Guid.TryParse(userIdClaim, out var userId))
+        return Unauthorized();
+
+    try
+    {
+        await _authService.ChangePasswordAsync(userId, dto);
+        return Ok(new { message = "Password changed successfully" });
+    }
+    catch (UnauthorizedAccessException ex)
+    {
+        return Unauthorized(new { message = ex.Message });
+    }
+    catch (KeyNotFoundException ex)
+    {
+        return NotFound(new { message = ex.Message });
+    }
+}
+
+[HttpPost("confirm-email")]
+[ProducesResponseType(StatusCodes.Status200OK)]
+[ProducesResponseType(StatusCodes.Status400BadRequest)]
+public async Task<IActionResult> ConfirmEmail([FromBody] ConfirmEmailDto dto)
+{
+    var validationResult = await _confirmEmailValidator.ValidateAsync(dto);
+    if (!validationResult.IsValid)
+        return BadRequest(validationResult.Errors);
+
+    try
+    {
+        await _authService.ConfirmEmailAsync(dto);
+        return Ok(new { message = "Email confirmed successfully" });
+    }
+    catch (KeyNotFoundException)
+    {
+        return NotFound(new { message = "User not found" });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return BadRequest(new { message = ex.Message });
+    }
+}
+    
 }

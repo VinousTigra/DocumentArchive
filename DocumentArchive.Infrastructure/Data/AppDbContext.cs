@@ -20,6 +20,7 @@ public class AppDbContext : DbContext
     public DbSet<DocumentVersion> DocumentVersions => Set<DocumentVersion>();
     public DbSet<ArchiveLog> ArchiveLogs => Set<ArchiveLog>();
     public DbSet<UserSession> UserSessions => Set<UserSession>();
+    public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -343,6 +344,23 @@ public class AppDbContext : DbContext
             new RolePermission { RoleId = userRoleId, PermissionId = editOwnDocsPermId },
             new RolePermission { RoleId = userRoleId, PermissionId = deleteOwnDocsPermId }
         );
+        // password
+        modelBuilder.Entity<PasswordResetToken>(entity =>
+        {
+            entity.HasKey(t => t.Id);
+            entity.Property(t => t.Token).IsRequired().HasMaxLength(500);
+            entity.Property(t => t.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.HasOne(t => t.User)
+                .WithMany() // можно добавить коллекцию в User, если нужно
+                .HasForeignKey(t => t.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(t => t.Token).IsUnique();
+            entity.HasIndex(t => t.ExpiresAt);
+        });
+
+
         base.OnModelCreating(modelBuilder);
     }
 }
