@@ -52,7 +52,7 @@ public class TokenService : ITokenService
         secretKey = jwtSettings["SecretKey"];
         if (string.IsNullOrEmpty(secretKey))
             throw new InvalidOperationException("JWT SecretKey is not configured.");
-        
+
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
@@ -62,6 +62,9 @@ public class TokenService : ITokenService
             claims,
             expires: DateTime.UtcNow.AddMinutes(expirationMinutes),
             signingCredentials: creds);
+
+        if (user.DateOfBirth.HasValue)
+            claims.Add(new Claim("DateOfBirth", user.DateOfBirth.Value.ToString("yyyy-MM-dd")));
 
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
@@ -123,17 +126,6 @@ public class TokenService : ITokenService
         _logger.LogInformation("All sessions revoked for user {UserId}", userId);
     }
 
-    private string GenerateSecureRefreshToken()
-    {
-        var randomBytes = new byte[64];
-        using (var rng = RandomNumberGenerator.Create())
-        {
-            rng.GetBytes(randomBytes);
-        }
-
-        return Convert.ToBase64String(randomBytes);
-    }
-    
     public DateTime GetAccessTokenExpiry()
     {
         var minutes = int.Parse(_configuration.GetSection("JwtSettings")["AccessTokenExpirationMinutes"] ?? "15");
@@ -144,5 +136,16 @@ public class TokenService : ITokenService
     {
         var days = int.Parse(_configuration.GetSection("JwtSettings")["RefreshTokenExpirationDays"] ?? "7");
         return DateTime.UtcNow.AddDays(days);
+    }
+
+    private string GenerateSecureRefreshToken()
+    {
+        var randomBytes = new byte[64];
+        using (var rng = RandomNumberGenerator.Create())
+        {
+            rng.GetBytes(randomBytes);
+        }
+
+        return Convert.ToBase64String(randomBytes);
     }
 }

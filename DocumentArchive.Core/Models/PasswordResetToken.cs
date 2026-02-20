@@ -9,4 +9,5 @@ public class PasswordResetToken
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime ExpiresAt { get; set; }
     public bool IsUsed { get; set; }
+    public string TokenHash { get; set; } = string.Empty;
 }

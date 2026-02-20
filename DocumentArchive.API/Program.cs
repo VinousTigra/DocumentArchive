@@ -1,8 +1,10 @@
 using System.Text;
 using DocumentArchive.API.Middleware;
+using DocumentArchive.Core.Authorization;
 using DocumentArchive.Infrastructure.Data;
 using DocumentArchive.Services.DependencyInjection;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -45,7 +47,29 @@ builder.Services.AddAuthentication(options =>
             };
     });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    // 1. Простая ролевая политика
+    options.AddPolicy("RequireAdminRole", policy => policy.RequireRole("Admin"));
+
+    // 2. Политика на подтверждение email (через claim)
+    options.AddPolicy("EmailConfirmed", policy => policy.RequireClaim("IsEmailConfirmed", "True"));
+
+    // 3. Политика на возраст (кастомная)
+    options.AddPolicy("MinimumAge18", policy =>
+        policy.Requirements.Add(new MinimumAgeRequirement(18)));
+
+    // 4. Политика на право редактирования документа
+    options.AddPolicy("CanEditDocument", policy =>
+        policy.Requirements.Add(new PermissionRequirement("EditOwnDocuments", "EditAnyDocument")));
+
+    // 5. Политика на право удаления документа
+    options.AddPolicy("CanDeleteDocument", policy =>
+        policy.Requirements.Add(new PermissionRequirement("DeleteOwnDocuments", "DeleteAnyDocument")));
+});
+builder.Services.AddSingleton<IAuthorizationHandler, MinimumAgeHandler>();
+builder.Services.AddSingleton<IAuthorizationHandler, PermissionHandler>();
+
 
 // Настройка OpenAPI (Scalar)
 builder.Services.AddOpenApi(options =>

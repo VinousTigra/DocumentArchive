@@ -24,6 +24,7 @@ public static class ServicesServiceRegistration
         services.AddScoped<IDocumentVersionService, DocumentVersionService>();
         services.AddScoped<ITokenService, TokenService>();
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IAuditService, AuditService>();
 
         // Валидаторы 
         services.AddValidatorsFromAssemblyContaining<CreateDocumentDtoValidator>();
