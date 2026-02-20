@@ -21,6 +21,7 @@ public class AppDbContext : DbContext
     public DbSet<ArchiveLog> ArchiveLogs => Set<ArchiveLog>();
     public DbSet<UserSession> UserSessions => Set<UserSession>();
     public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
+    public DbSet<EmailConfirmationToken> EmailConfirmationTokens => Set<EmailConfirmationToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -225,6 +226,7 @@ public class AppDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
+
         // Seed-данные для ролей (используем статические GUID и фиксированную дату)
         var adminRoleId = Guid.Parse("11111111-1111-1111-1111-111111111111");
         var userRoleId = Guid.Parse("22222222-2222-2222-2222-222222222222");
@@ -358,6 +360,21 @@ public class AppDbContext : DbContext
 
             entity.HasIndex(t => t.Token).IsUnique();
             entity.HasIndex(t => t.ExpiresAt);
+        });
+
+        modelBuilder.Entity<EmailConfirmationToken>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.TokenHash).IsRequired().HasMaxLength(500);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.HasOne(e => e.User)
+                .WithMany() // если нужно, добавьте коллекцию в User: public ICollection<EmailConfirmationToken> EmailConfirmationTokens { get; set; }
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => e.TokenHash);
+            entity.HasIndex(e => e.ExpiresAt);
         });
 
 

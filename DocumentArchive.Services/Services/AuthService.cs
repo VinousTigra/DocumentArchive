@@ -13,11 +13,11 @@ namespace DocumentArchive.Services.Services;
 
 public class AuthService : IAuthService
 {
-    private readonly AppDbContext _context;
-    private readonly ITokenService _tokenService;
-    private readonly IMapper _mapper;
-    private readonly ILogger<AuthService> _logger;
     private readonly IConfiguration _configuration;
+    private readonly AppDbContext _context;
+    private readonly ILogger<AuthService> _logger;
+    private readonly IMapper _mapper;
+    private readonly ITokenService _tokenService;
 
     public AuthService(
         AppDbContext context,
@@ -32,19 +32,11 @@ public class AuthService : IAuthService
         _logger = logger;
         _configuration = configuration;
     }
-    
-    private string GenerateSecureToken()
-    {
-        var randomBytes = new byte[32];
-        using var rng = RandomNumberGenerator.Create();
-        rng.GetBytes(randomBytes);
-        return Convert.ToBase64String(randomBytes);
-    }
-    
+
 
     public async Task<AuthResponseDto> RegisterAsync(RegisterDto registerDto, string deviceInfo, string ipAddress)
     {
-        // Проверки уже выполнены валидатором, но дублируем для безопасности
+        // Проверки уникальности (как раньше)
         if (await _context.Users.AnyAsync(u => u.Email == registerDto.Email))
             throw new InvalidOperationException("Email already registered");
         if (await _context.Users.AnyAsync(u => u.Username == registerDto.Username))
@@ -70,18 +62,29 @@ public class AuthService : IAuthService
 
         _context.UserRoles.Add(new UserRole { UserId = user.Id, RoleId = userRole.Id });
 
+        // Генерация токена подтверждения email
+        var confirmationToken = GenerateSecureToken(); // используем тот же метод, что и для сброса пароля
+        var emailToken = new EmailConfirmationToken
+        {
+            UserId = user.Id,
+            TokenHash = BCrypt.Net.BCrypt.HashPassword(confirmationToken),
+            ExpiresAt = DateTime.UtcNow.AddDays(7) // срок действия 7 дней
+        };
+        _context.EmailConfirmationTokens.Add(emailToken);
+
         await _context.SaveChangesAsync();
 
         _logger.LogInformation("User {UserId} registered", user.Id);
 
-        // Возвращаем ответ без токенов (как просят в задании)
         return new AuthResponseDto
         {
             UserId = user.Id,
             Email = user.Email,
             Username = user.Username,
+            FirstName = user.FirstName,
+            LastName = user.LastName,
             Roles = new List<string> { "User" },
-            // Токены не выдаём
+            ConfirmationToken = confirmationToken // возвращаем токен для тестирования
         };
     }
 
@@ -89,7 +92,7 @@ public class AuthService : IAuthService
     {
         var user = await _context.Users
             .Include(u => u.UserRoles)
-                .ThenInclude(ur => ur.Role)
+            .ThenInclude(ur => ur.Role)
             .FirstOrDefaultAsync(u => u.Email == loginDto.EmailOrUsername || u.Username == loginDto.EmailOrUsername);
 
         if (user == null || !user.IsActive || user.IsDeleted)
@@ -126,7 +129,8 @@ public class AuthService : IAuthService
         };
     }
 
-    public async Task<AuthResponseDto> RefreshTokenAsync(RefreshTokenDto refreshTokenDto, string deviceInfo, string ipAddress)
+    public async Task<AuthResponseDto> RefreshTokenAsync(RefreshTokenDto refreshTokenDto, string deviceInfo,
+        string ipAddress)
     {
         // Извлекаем userId из истекшего access token (без проверки срока)
         var handler = new JwtSecurityTokenHandler();
@@ -137,7 +141,7 @@ public class AuthService : IAuthService
 
         var user = await _context.Users
             .Include(u => u.UserRoles)
-                .ThenInclude(ur => ur.Role)
+            .ThenInclude(ur => ur.Role)
             .FirstOrDefaultAsync(u => u.Id == userId && u.IsActive && !u.IsDeleted);
         if (user == null)
             throw new UnauthorizedAccessException("User not found");
@@ -185,7 +189,6 @@ public class AuthService : IAuthService
             .Where(s => !s.IsRevoked && s.ExpiresAt > DateTime.UtcNow)
             .ToListAsync();
         foreach (var session in sessions)
-        {
             if (BCrypt.Net.BCrypt.Verify(refreshToken, session.RefreshTokenHash))
             {
                 session.IsRevoked = true;
@@ -193,10 +196,10 @@ public class AuthService : IAuthService
                 _logger.LogInformation("Refresh token {SessionId} revoked", session.Id);
                 return;
             }
-        }
+
         throw new KeyNotFoundException("Refresh token not found or already expired");
     }
-    
+
     public async Task<AuthResponseDto> GetProfileAsync(Guid userId)
     {
         var user = await _context.Users
@@ -218,14 +221,15 @@ public class AuthService : IAuthService
             Roles = roles
         };
     }
-    
+
     public async Task ForgotPasswordAsync(ForgotPasswordDto dto, string ipAddress)
     {
         var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
         if (user == null)
         {
             // Не раскрываем существование пользователя
-            _logger.LogInformation("Password reset requested for non-existent email {Email} from IP {IpAddress}", dto.Email, ipAddress);
+            _logger.LogInformation("Password reset requested for non-existent email {Email} from IP {IpAddress}",
+                dto.Email, ipAddress);
             return;
         }
 
@@ -233,10 +237,7 @@ public class AuthService : IAuthService
         var existingTokens = await _context.PasswordResetTokens
             .Where(t => t.UserId == user.Id && !t.IsUsed && t.ExpiresAt > DateTime.UtcNow)
             .ToListAsync();
-        foreach (var token in existingTokens)
-        {
-            token.IsUsed = true; // или удалить
-        }
+        foreach (var token in existingTokens) token.IsUsed = true; // или удалить
 
         var resetToken = GenerateSecureToken();
         var tokenEntity = new PasswordResetToken
@@ -249,9 +250,10 @@ public class AuthService : IAuthService
         await _context.SaveChangesAsync();
 
         // Здесь должна быть отправка email с resetToken
-        _logger.LogInformation("Password reset token generated for user {UserId} from IP {IpAddress}", user.Id, ipAddress);
+        _logger.LogInformation("Password reset token generated for user {UserId} from IP {IpAddress}", user.Id,
+            ipAddress);
     }
-    
+
     public async Task ResetPasswordAsync(ResetPasswordDto dto, string ipAddress)
     {
         // Ищем токен в БД (сравниваем хеш)
@@ -280,8 +282,8 @@ public class AuthService : IAuthService
         await _context.SaveChangesAsync();
         _logger.LogInformation("Password reset for user {UserId} from IP {IpAddress}", user.Id, ipAddress);
     }
-    
-    
+
+
     public async Task ChangePasswordAsync(Guid userId, ChangePasswordDto dto)
     {
         var user = await _context.Users.FindAsync(userId);
@@ -300,7 +302,7 @@ public class AuthService : IAuthService
         await _context.SaveChangesAsync();
         _logger.LogInformation("Password changed for user {UserId}", userId);
     }
-    
+
     public async Task ConfirmEmailAsync(ConfirmEmailDto dto)
     {
         var user = await _context.Users.FindAsync(dto.UserId);
@@ -310,15 +312,32 @@ public class AuthService : IAuthService
         if (user.IsEmailConfirmed)
             throw new InvalidOperationException("Email already confirmed");
 
-        // Здесь должна быть проверка токена. Для упрощения будем считать, что токен — это хеш, сохранённый в поле пользователя или отдельной таблице.
-        // В реальном проекте создают отдельную таблицу EmailConfirmationToken.
-        // Пока реализуем упрощённо: генерируем токен при регистрации и сохраняем в поле EmailConfirmationToken (добавить в модель User).
-        // Для экономии времени я предлагаю реализовать это позже или использовать JWT.
-        // Сейчас просто установим IsEmailConfirmed = true (это небезопасно, но для теста).
+        // Получаем все действующие токены для этого пользователя
+        var validTokens = await _context.EmailConfirmationTokens
+            .Where(t => t.UserId == dto.UserId && !t.IsUsed && t.ExpiresAt > DateTime.UtcNow)
+            .ToListAsync();
+
+        // Ищем токен, который совпадает с предоставленным (проверяем через BCrypt)
+        var tokenEntity = validTokens.FirstOrDefault(t => BCrypt.Net.BCrypt.Verify(dto.Token, t.TokenHash));
+        if (tokenEntity == null)
+            throw new InvalidOperationException("Invalid or expired confirmation token");
+
+        // Подтверждаем email
         user.IsEmailConfirmed = true;
         user.UpdatedAt = DateTime.UtcNow;
+
+        // Помечаем токен как использованный
+        tokenEntity.IsUsed = true;
+
         await _context.SaveChangesAsync();
         _logger.LogInformation("Email confirmed for user {UserId}", user.Id);
     }
-    
+
+    private string GenerateSecureToken()
+    {
+        var randomBytes = new byte[32];
+        using var rng = RandomNumberGenerator.Create();
+        rng.GetBytes(randomBytes);
+        return Convert.ToBase64String(randomBytes);
+    }
 }
