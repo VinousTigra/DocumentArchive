@@ -14,18 +14,21 @@ namespace DocumentArchive.Services.Services;
 
 public class UserService : IUserService
 {
+    private readonly IAuditService _auditService;
     private readonly AppDbContext _context;
-    private readonly IMapper _mapper;
     private readonly ILogger<UserService> _logger;
+    private readonly IMapper _mapper;
 
     public UserService(
         AppDbContext context,
         IMapper mapper,
-        ILogger<UserService> logger)
+        ILogger<UserService> logger,
+        IAuditService auditService)
     {
         _context = context;
         _mapper = mapper;
         _logger = logger;
+        _auditService = auditService;
     }
 
     public async Task<PagedResult<UserListItemDto>> GetUsersAsync(
@@ -38,16 +41,14 @@ public class UserService : IUserService
 
         var query = _context.Users
             .AsNoTracking()
-            .Where(u => !u.IsDeleted) // предположим, что мягко удалённых не показываем
+            .Where(u => !u.IsDeleted)
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(search))
-        {
             query = query.Where(u => u.Username.Contains(search) ||
                                      u.Email.Contains(search) ||
                                      (u.FirstName != null && u.FirstName.Contains(search)) ||
                                      (u.LastName != null && u.LastName.Contains(search)));
-        }
 
         var totalCount = await query.CountAsync(cancellationToken);
 
@@ -72,22 +73,20 @@ public class UserService : IUserService
         var user = await _context.Users
             .AsNoTracking()
             .Include(u => u.UserRoles)
-                .ThenInclude(ur => ur.Role)
+            .ThenInclude(ur => ur.Role)
             .FirstOrDefaultAsync(u => u.Id == id && !u.IsDeleted, cancellationToken);
 
         return user == null ? null : _mapper.Map<UserResponseDto>(user);
     }
 
-    public async Task<UserResponseDto> CreateUserAsync(CreateUserDto createDto, CancellationToken cancellationToken = default)
+    public async Task<UserResponseDto> CreateUserAsync(CreateUserDto createDto,
+        CancellationToken cancellationToken = default)
     {
-        // Проверка уникальности email и username
-        var emailExists = await _context.Users
-            .AnyAsync(u => u.Email == createDto.Email, cancellationToken);
+        var emailExists = await _context.Users.AnyAsync(u => u.Email == createDto.Email, cancellationToken);
         if (emailExists)
             throw new InvalidOperationException($"User with email '{createDto.Email}' already exists.");
 
-        var usernameExists = await _context.Users
-            .AnyAsync(u => u.Username == createDto.Username, cancellationToken);
+        var usernameExists = await _context.Users.AnyAsync(u => u.Username == createDto.Username, cancellationToken);
         if (usernameExists)
             throw new InvalidOperationException($"User with username '{createDto.Username}' already exists.");
 
@@ -101,6 +100,15 @@ public class UserService : IUserService
         await _context.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("User {UserId} created", user.Id);
+        await _auditService.LogAsync(
+            SecurityEventType.UserCreated,
+            user.Id,
+            user.Email,
+            null,
+            null,
+            true,
+            new { createDto.Username, createDto.Email });
+
         return _mapper.Map<UserResponseDto>(user);
     }
 
@@ -111,35 +119,41 @@ public class UserService : IUserService
         if (user == null)
             throw new KeyNotFoundException($"User with id {id} not found");
 
-        // Проверка уникальности email, если он меняется
         if (!string.IsNullOrWhiteSpace(updateDto.Email) && updateDto.Email != user.Email)
         {
-            var emailExists = await _context.Users
-                .AnyAsync(u => u.Email == updateDto.Email && u.Id != id, cancellationToken);
+            var emailExists =
+                await _context.Users.AnyAsync(u => u.Email == updateDto.Email && u.Id != id, cancellationToken);
             if (emailExists)
                 throw new InvalidOperationException($"User with email '{updateDto.Email}' already exists.");
         }
 
-        // Проверка уникальности username, если он меняется
         if (!string.IsNullOrWhiteSpace(updateDto.Username) && updateDto.Username != user.Username)
         {
-            var usernameExists = await _context.Users
-                .AnyAsync(u => u.Username == updateDto.Username && u.Id != id, cancellationToken);
+            var usernameExists = await _context.Users.AnyAsync(u => u.Username == updateDto.Username && u.Id != id,
+                cancellationToken);
             if (usernameExists)
                 throw new InvalidOperationException($"User with username '{updateDto.Username}' already exists.");
         }
 
         _mapper.Map(updateDto, user);
         user.UpdatedAt = DateTime.UtcNow;
-
         await _context.SaveChangesAsync(cancellationToken);
+
         _logger.LogInformation("User {UserId} updated", id);
+        await _auditService.LogAsync(
+            SecurityEventType.UserUpdated,
+            user.Id,
+            user.Email,
+            null,
+            null,
+            true,
+            new { updateDto.Username, updateDto.Email });
     }
 
     public async Task DeleteUserAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var user = await _context.Users
-            .Include(u => u.Documents) // для проверки наличия документов
+            .Include(u => u.Documents)
             .FirstOrDefaultAsync(u => u.Id == id && !u.IsDeleted, cancellationToken);
         if (user == null)
             throw new KeyNotFoundException($"User with id {id} not found");
@@ -147,12 +161,19 @@ public class UserService : IUserService
         if (user.Documents.Any())
             throw new InvalidOperationException("Cannot delete user with existing documents.");
 
-        // Soft delete или реальное удаление? По заданию в модели есть IsDeleted, делаем soft delete
         user.IsDeleted = true;
         user.UpdatedAt = DateTime.UtcNow;
-
         await _context.SaveChangesAsync(cancellationToken);
+
         _logger.LogInformation("User {UserId} deleted (soft)", id);
+        await _auditService.LogAsync(
+            SecurityEventType.UserDeleted,
+            user.Id,
+            user.Email,
+            null,
+            null,
+            true,
+            new { Reason = "Soft delete" });
     }
 
     public async Task<PagedResult<DocumentListItemDto>> GetUserDocumentsAsync(
@@ -161,8 +182,7 @@ public class UserService : IUserService
         int pageSize,
         CancellationToken cancellationToken = default)
     {
-        var userExists = await _context.Users
-            .AnyAsync(u => u.Id == userId && !u.IsDeleted, cancellationToken);
+        var userExists = await _context.Users.AnyAsync(u => u.Id == userId && !u.IsDeleted, cancellationToken);
         if (!userExists)
             throw new KeyNotFoundException($"User with id {userId} not found");
 
@@ -172,7 +192,6 @@ public class UserService : IUserService
             .OrderBy(d => d.Title);
 
         var totalCount = await query.CountAsync(cancellationToken);
-
         var items = await query
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
@@ -187,8 +206,9 @@ public class UserService : IUserService
             TotalCount = totalCount
         };
     }
-    
-    public async Task<UserStatisticsDto> GetUserStatisticsAsync(Guid userId, CancellationToken cancellationToken = default)
+
+    public async Task<UserStatisticsDto> GetUserStatisticsAsync(Guid userId,
+        CancellationToken cancellationToken = default)
     {
         var user = await _context.Users
             .Where(u => u.Id == userId && !u.IsDeleted)
@@ -209,11 +229,12 @@ public class UserService : IUserService
         return user;
     }
 
-    public async Task<UsersGeneralStatisticsDto> GetUsersGeneralStatisticsAsync(CancellationToken cancellationToken = default)
+    public async Task<UsersGeneralStatisticsDto> GetUsersGeneralStatisticsAsync(
+        CancellationToken cancellationToken = default)
     {
         var totalUsers = await _context.Users.CountAsync(u => !u.IsDeleted, cancellationToken);
-        var activeToday = await _context.Users
-            .CountAsync(u => u.LastLoginAt >= DateTime.UtcNow.Date, cancellationToken);
+        var activeToday =
+            await _context.Users.CountAsync(u => u.LastLoginAt >= DateTime.UtcNow.Date, cancellationToken);
         var usersByDate = await _context.Users
             .Where(u => !u.IsDeleted)
             .GroupBy(u => u.CreatedAt.Date)
@@ -227,49 +248,63 @@ public class UserService : IUserService
             UsersByRegistrationDate = usersByDate
         };
     }
+
     public async Task AssignRoleAsync(Guid userId, Guid roleId, CancellationToken cancellationToken = default)
     {
-        // Проверяем существование пользователя
-        var user = await _context.Users
-            .FirstOrDefaultAsync(u => u.Id == userId && !u.IsDeleted, cancellationToken);
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId && !u.IsDeleted, cancellationToken);
         if (user == null)
             throw new KeyNotFoundException($"User with id {userId} not found.");
 
-        // Проверяем существование роли
-        var role = await _context.Roles
-            .FirstOrDefaultAsync(r => r.Id == roleId, cancellationToken);
+        var role = await _context.Roles.FirstOrDefaultAsync(r => r.Id == roleId, cancellationToken);
         if (role == null)
             throw new KeyNotFoundException($"Role with id {roleId} not found.");
 
-        // Проверяем, не назначена ли уже роль
-        var existing = await _context.UserRoles
-            .FirstOrDefaultAsync(ur => ur.UserId == userId && ur.RoleId == roleId, cancellationToken);
+        var existing =
+            await _context.UserRoles.FirstOrDefaultAsync(ur => ur.UserId == userId && ur.RoleId == roleId,
+                cancellationToken);
         if (existing != null)
             throw new InvalidOperationException("User already has this role.");
 
-        // Создаём связь
         var userRole = new UserRole
         {
             UserId = userId,
-            RoleId = roleId
+            RoleId = roleId,
+            AssignedAt = DateTime.UtcNow
         };
         _context.UserRoles.Add(userRole);
         await _context.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("Role {RoleId} assigned to user {UserId}", roleId, userId);
+        await _auditService.LogAsync(
+            SecurityEventType.RoleAssigned,
+            userId,
+            user.Email,
+            null,
+            null,
+            true,
+            new { RoleId = roleId, RoleName = role.Name });
     }
 
     public async Task RemoveRoleAsync(Guid userId, Guid roleId, CancellationToken cancellationToken = default)
     {
         var userRole = await _context.UserRoles
+            .Include(ur => ur.Role)
             .FirstOrDefaultAsync(ur => ur.UserId == userId && ur.RoleId == roleId, cancellationToken);
         if (userRole == null)
             throw new KeyNotFoundException("User does not have this role.");
 
+        var roleName = userRole.Role?.Name;
         _context.UserRoles.Remove(userRole);
         await _context.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("Role {RoleId} removed from user {UserId}", roleId, userId);
+        await _auditService.LogAsync(
+            SecurityEventType.RoleRevoked,
+            userId,
+            null, // email можно не передавать
+            null,
+            null,
+            true,
+            new { RoleId = roleId, RoleName = roleName });
     }
-    
 }

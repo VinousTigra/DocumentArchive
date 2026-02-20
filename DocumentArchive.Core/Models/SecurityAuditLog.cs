@@ -10,10 +10,19 @@ public enum SecurityEventType
     PasswordReset,
     PasswordResetRequested,
     EmailConfirmed,
+    TokenRefresh,
+    TokenRevoke,
+
+    UserCreated,
+    UserUpdated,
+    UserDeleted,
     RoleAssigned,
     RoleRevoked,
-    TokenRefresh,
-    TokenRevoke
+    RoleCreated,
+    RoleUpdated,
+    RoleDeleted,
+    PermissionAssigned,
+    PermissionRevoked
 }
 
 public class SecurityAuditLog
