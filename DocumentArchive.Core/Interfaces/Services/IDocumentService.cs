@@ -26,9 +26,7 @@ public interface IDocumentService
 
     Task<PagedResult<ArchiveLogListItemDto>> GetDocumentLogsAsync(Guid documentId, int page, int pageSize,
         Guid currentUserId, List<string> permissions, CancellationToken cancellationToken);
-
-    // Bulk-методы тоже нужно адаптировать, но пока можно оставить без изменений, если они используются только админами.
-    // Для простоты добавим параметры и в них:
+    
     Task<BulkOperationResult<Guid>> CreateBulkAsync(IEnumerable<CreateDocumentDto> createDtos, Guid currentUserId,
         List<string> permissions, CancellationToken cancellationToken);
 
@@ -38,7 +36,6 @@ public interface IDocumentService
     Task<BulkOperationResult<Guid>> DeleteBulkAsync(IEnumerable<Guid> ids, Guid currentUserId, List<string> permissions,
         CancellationToken cancellationToken);
 
-    // Статистические методы обычно доступны всем, но можно оставить без изменений или тоже с проверкой
     Task<Dictionary<string, int>> GetDocumentsCountByCategoryAsync(CancellationToken cancellationToken);
     Task<DocumentsStatisticsDto> GetDocumentsStatisticsAsync(CancellationToken cancellationToken);
 }

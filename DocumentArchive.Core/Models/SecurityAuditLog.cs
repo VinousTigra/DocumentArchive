@@ -9,7 +9,6 @@ public enum SecurityEventType
     PasswordChange,
     PasswordReset,
     PasswordResetRequested,
-    EmailConfirmed,
     TokenRefresh,
     TokenRevoke,
 

@@ -7,7 +7,6 @@ public class User
     public string Email { get; set; } = string.Empty;
 
 
-    // Поля для аутентификации (ЛР4)
     public string? PasswordHash { get; set; }
     public string? PasswordSalt { get; set; }
     public string? FirstName { get; set; }

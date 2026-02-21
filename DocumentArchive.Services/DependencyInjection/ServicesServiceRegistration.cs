@@ -11,7 +11,7 @@ public static class ServicesServiceRegistration
 {
     public static IServiceCollection AddServices(this IServiceCollection services)
     {
-        // Регистрируем AutoMapper (уже должно быть)
+        // Регистрируем AutoMapper
         services.AddAutoMapper(typeof(MappingProfile));
 
         // Регистрируем сервисы
