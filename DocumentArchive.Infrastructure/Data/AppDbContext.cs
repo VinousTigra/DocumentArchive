@@ -44,8 +44,6 @@ public class AppDbContext : DbContext
                 .HasMaxLength(20);
             entity.Property(u => u.PasswordHash)
                 .HasMaxLength(500);
-            entity.Property(u => u.PasswordSalt)
-                .HasMaxLength(500);
             entity.Property(u => u.CreatedAt)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.Property(u => u.IsActive)
