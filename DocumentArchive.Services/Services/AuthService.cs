@@ -1,4 +1,5 @@
-﻿using System.IdentityModel.Tokens.Jwt;
+﻿using System.Diagnostics;
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
@@ -41,6 +42,7 @@ public class AuthService : IAuthService
 
         var jwtSettings = configuration.GetSection("JwtSettings");
         var secretKey = jwtSettings["SecretKey"];
+        Debug.Assert(secretKey != null, nameof(secretKey) + " != null");
         _tokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,

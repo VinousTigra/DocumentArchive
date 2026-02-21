@@ -384,7 +384,7 @@ public class AppDbContext : DbContext
             entity.Property(uc => uc.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
 
             entity.HasOne(uc => uc.User)
-                .WithMany(u => u.UserClaims) // добавьте навигацию в User
+                .WithMany(u => u.UserClaims) 
                 .HasForeignKey(uc => uc.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
 
