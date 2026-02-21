@@ -40,8 +40,6 @@ public class AppDbContext : DbContext
                 .HasMaxLength(100);
             entity.Property(u => u.LastName)
                 .HasMaxLength(100);
-            entity.Property(u => u.PhoneNumber)
-                .HasMaxLength(20);
             entity.Property(u => u.PasswordHash)
                 .HasMaxLength(500);
             entity.Property(u => u.CreatedAt)

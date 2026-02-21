@@ -162,7 +162,6 @@ public class MappingProfileTests
         user.FirstName.Should().BeNull();
         user.LastName.Should().BeNull();
         user.DateOfBirth.Should().BeNull();
-        user.PhoneNumber.Should().BeNull();
     }
 
     [Fact]
@@ -239,7 +238,6 @@ public class MappingProfileTests
         user.FirstName.Should().Be(dto.FirstName);
         user.LastName.Should().Be(dto.LastName);
         user.DateOfBirth.Should().Be(dto.DateOfBirth);
-        user.PhoneNumber.Should().Be(dto.PhoneNumber);
         // Поля, которые игнорируются при маппинге, остаются со значениями по умолчанию
         user.PasswordHash.Should().BeNull();
         user.LastLoginAt.Should().BeNull();
